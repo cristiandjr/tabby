@@ -11,6 +11,7 @@ public final class WindowProvider {
         public var excludedBySubrole = 0
         public var excludedMinimized = 0
         public var excludedSystem = 0
+        public var unmatchedWindows: [String] = []
 
         public init() {}
     }
@@ -57,6 +58,7 @@ public final class WindowProvider {
             var used = usedIndices[record.pid] ?? []
             guard let index = matchIndex(for: record, in: axWindows, excluding: used, diagnostics: &diagnostics) else {
                 diagnostics.unmatched += 1
+                diagnostics.unmatchedWindows.append("\(record.ownerName) \(Int(record.bounds.width))x\(Int(record.bounds.height))")
                 continue
             }
             used.insert(index)

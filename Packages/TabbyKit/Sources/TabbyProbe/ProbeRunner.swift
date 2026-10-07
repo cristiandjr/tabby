@@ -31,13 +31,17 @@ final class ProbeRunner {
     private let interceptor = KeyboardInterceptor()
     private let provider = WindowProvider()
     private let overlay = SelectionOverlay()
-    private let dumpFinished = Inbox<Bool>()
     private let outputDirectory: URL
     private let startedAt: ContinuousClock.Instant
 
     private var report = ProbeReport()
     private var phase: Phase = .idle
     private var missionControlOpen = false
+    private var notificationsSeen = false
+    private var fallbackOpen = false
+    private var dockBaselineCount = 0
+    private var dockSignature: [String] = []
+    private var pollTask: Task<Void, Never>?
     private var lastKeyDown: (code: UInt16, modifiers: ModifierSet, at: ContinuousClock.Instant)?
     private var dumpedDuringDetection = false
     private var referenceWindowIDs: Set<CGWindowID> = []
@@ -73,6 +77,7 @@ final class ProbeRunner {
         console.say("Post events: \(SystemStatus.postEventAccess)")
         console.say("Secure input: \(SystemStatus.secureInputEnabled)")
         console.say("Dock pid: \(DockAccessibility.pid.map { String($0) } ?? "-")")
+        console.say("Dock top level: \(DockAccessibility.topLevelSignature().joined(separator: ", "))")
         console.say("_AXUIElementGetWindow: \(PrivateAXBridge.isAvailable)")
         for screen in NSScreen.screens {
             console.say("Screen: \(screen.localizedName) \(NSStringFromRect(screen.frame)) @\(screen.backingScaleFactor)x")
@@ -83,6 +88,10 @@ final class ProbeRunner {
         console.title("Tabby probe · Spike 0")
         console.say(t("Guided test, about 10 minutes. Results stay on this Mac:", "Prueba guiada de unos 10 minutos. Los resultados quedan en esta Mac:"))
         console.say("  \(outputDirectory.path)")
+        console.say(t(
+            "\"Return\" is the ↩ key (Enter). Ctrl+C stops the probe at any time.",
+            "\"Enter\" es la tecla ↩ (Intro / Return). Ctrl+C corta el probe en cualquier momento."
+        ))
         guard ensureAccessibility() else { return 2 }
         AX.setGlobalTimeout(0.3)
         report.screens = NSScreen.screens.map {
@@ -90,7 +99,9 @@ final class ProbeRunner {
         }
         startObserving()
         await stepWindows()
+        startDockPolling()
         await stepDetection()
+        await stepGuidedDump()
         await stepNativeKeys()
         await stepDemo()
         finish()
@@ -130,8 +141,8 @@ final class ProbeRunner {
         interceptor.onKey = { [weak self] key in
             self?.handleKey(key)
         }
-        interceptor.onKeyDown = { [weak self] code, modifiers in
-            self?.lastKeyDown = (code, modifiers, ContinuousClock().now)
+        interceptor.onKeyDown = { [weak self] code, modifiers, instant in
+            self?.lastKeyDown = (code, modifiers, instant)
         }
         report.tapInstalled = interceptor.install()
         let registrationText = report.observerRegistration.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: ", ")
@@ -139,13 +150,53 @@ final class ProbeRunner {
         console.say(t("Keyboard tap installed: ", "Tap de teclado instalado: ") + (report.tapInstalled ? "✅" : "❌"))
     }
 
+    private func startDockPolling() {
+        dockSignature = DockAccessibility.topLevelSignature()
+        dockBaselineCount = dockSignature.count
+        report.dockBaseline = dockSignature
+        pollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard let self else { return }
+                self.pollDock()
+            }
+        }
+    }
+
+    private func pollDock() {
+        let signature = DockAccessibility.topLevelSignature()
+        guard signature != dockSignature else { return }
+        dockSignature = signature
+        let expanded = signature.count > dockBaselineCount
+        let now = ContinuousClock().now
+        report.events.append(.init(
+            name: expanded ? "dockTreeExpanded" : "dockTreeRestored",
+            atMs: milliseconds(from: startedAt, to: now),
+            phase: phase.rawValue,
+            detail: signature.joined(separator: ", ")
+        ))
+        console.say("  · " + t("Dock tree changed: ", "Cambió el árbol del Dock: ") + signature.joined(separator: ", "))
+        guard !notificationsSeen else { return }
+        if expanded, !fallbackOpen {
+            fallbackOpen = true
+            missionControlOpen = true
+            console.say("  ● " + t("Mission Control opened (detected through the Dock tree)", "Mission Control abierto (detectado por el árbol del Dock)"))
+            missionControlOpened(at: now, detectedBy: "dockTree")
+        } else if !expanded, fallbackOpen {
+            fallbackOpen = false
+            missionControlOpen = false
+            console.say("  ○ " + t("Mission Control closed (Dock tree)", "Mission Control cerrado (árbol del Dock)"))
+            missionControlClosed(at: now)
+        }
+    }
+
     private func stepWindows() async {
-        console.title(t("Step 1/4 · Windows", "Paso 1/4 · Ventanas"))
+        console.title(t("Step 1/5 · Windows", "Paso 1/5 · Ventanas"))
         console.say(t(
             "Open several windows. Ideally: 2 overlapping Finder windows, a browser, 2 Terminal windows and VS Code.",
             "Abrí varias ventanas. Ideal: 2 ventanas de Finder superpuestas, un navegador, 2 ventanas de Terminal y VS Code."
         ))
-        await console.waitForReturn(t("When they are open, press Return here.", "Cuando estén abiertas, presioná Return acá."))
+        await console.waitForReturn(t("When they are open, press Return (↩) here.", "Cuando estén abiertas, presioná Enter (↩) acá."))
         let started = ContinuousClock().now
         let windows = provider.snapshot()
         let elapsed = milliseconds(from: started, to: ContinuousClock().now)
@@ -156,14 +207,14 @@ final class ProbeRunner {
         }
         let diagnostics = provider.lastDiagnostics
         console.say(t(
-            "Windows: \(windows.count) · matched with _AXUIElementGetWindow: \(diagnostics.matchedByPrivateAPI) · by frame: \(diagnostics.matchedByFrame) · unmatched: \(diagnostics.unmatched) · \(Int(elapsed)) ms",
-            "Ventanas: \(windows.count) · emparejadas con _AXUIElementGetWindow: \(diagnostics.matchedByPrivateAPI) · por frame: \(diagnostics.matchedByFrame) · sin emparejar: \(diagnostics.unmatched) · \(Int(elapsed)) ms"
+            "Windows: \(windows.count) · matched with _AXUIElementGetWindow: \(diagnostics.matchedByPrivateAPI) · by frame: \(diagnostics.matchedByFrame) · window-server only: \(diagnostics.unmatched) · \(Int(elapsed)) ms",
+            "Ventanas: \(windows.count) · emparejadas con _AXUIElementGetWindow: \(diagnostics.matchedByPrivateAPI) · por frame: \(diagnostics.matchedByFrame) · solo del WindowServer: \(diagnostics.unmatched) · \(Int(elapsed)) ms"
         ))
     }
 
     private func stepDetection() async {
         phase = .detection
-        console.title(t("Step 2/4 · Detection", "Paso 2/4 · Detección"))
+        console.title(t("Step 2/5 · Detection", "Paso 2/5 · Detección"))
         console.say(t(
             """
             Open and close Mission Control at least 4 times, with a different method each time if you can:
@@ -183,63 +234,101 @@ final class ProbeRunner {
             """
         ))
         interceptor.setMode(.observe)
-        await console.waitForReturn(t("When you are done, press Return here.", "Cuando termines, presioná Return acá."))
+        await console.waitForReturn(t("When you are done, press Return (↩) here.", "Cuando termines, presioná Enter (↩) acá."))
         interceptor.setMode(.off)
         phase = .idle
-        let opens = report.events.filter { $0.phase == Phase.detection.rawValue && $0.name == MissionControlEvent.showAllWindows.rawValue }.count
-        let exits = report.events.filter { $0.phase == Phase.detection.rawValue && $0.name == MissionControlEvent.exit.rawValue }.count
-        console.say(t("Detected \(opens) openings and \(exits) closings.", "Detecté \(opens) aperturas y \(exits) cierres."))
+        let notified = report.events.filter { $0.phase == Phase.detection.rawValue && $0.name == MissionControlEvent.showAllWindows.rawValue }.count
+        let dockChanges = report.events.filter { $0.phase == Phase.detection.rawValue && $0.name == "dockTreeExpanded" }.count
+        console.say(t(
+            "Openings detected · notifications: \(notified) · Dock tree: \(dockChanges)",
+            "Aperturas detectadas · notificaciones: \(notified) · árbol del Dock: \(dockChanges)"
+        ))
+    }
+
+    private func stepGuidedDump() async {
+        console.title(t("Step 3/5 · Dock snapshot", "Paso 3/5 · Foto del Dock"))
+        console.say(t(
+            "After you press Return (↩), open Mission Control and leave it open. In 5 seconds the probe saves the Dock accessibility tree.",
+            "Después de presionar Enter (↩), abrí Mission Control y dejalo abierto. En 5 segundos el probe guarda el árbol de accesibilidad del Dock."
+        ))
+        await console.waitForReturn(t("Press Return (↩) to start the countdown.", "Presioná Enter (↩) para empezar la cuenta regresiva."))
+        for remaining in stride(from: 5, through: 1, by: -1) {
+            console.say("  \(remaining)…")
+            try? await Task.sleep(for: .seconds(1))
+        }
+        saveDockTree(label: "guided")
+        captureWindowsDuringMissionControl()
+        console.say(t("Saved. You can close Mission Control now.", "Guardado. Ya podés cerrar Mission Control."))
+        try? await Task.sleep(for: .seconds(2))
     }
 
     private func stepNativeKeys() async {
         phase = .nativeKeys
-        console.title(t("Step 3/4 · Native Mission Control keys", "Paso 3/4 · Teclas nativas de Mission Control"))
+        console.title(t("Step 4/5 · Native Mission Control keys", "Paso 4/5 · Teclas nativas de Mission Control"))
         console.say(t(
-            "Tabby is not intercepting anything now. Open Mission Control and try: ← → ↑ ↓, Tab, Space and Return. Then close it (Esc) and come back here.",
-            "Ahora Tabby no intercepta nada. Abrí Mission Control y probá: ← → ↑ ↓, Tab, Espacio y Return. Después cerralo (Esc) y volvé acá."
+            """
+            Tabby is not intercepting anything now. Without touching the mouse, open Mission Control and try in this order:
+              1. Tab
+              2. Space
+              3. The arrow keys ← → ↑ ↓
+              4. Return (↩) on the highlighted window
+            If Mission Control is still open, close it with Esc. Then come back here.
+            """,
+            """
+            Ahora Tabby no intercepta nada. Sin tocar el mouse, abrí Mission Control y probá en este orden:
+              1. Tab
+              2. Espacio
+              3. Las flechas ← → ↑ ↓
+              4. Enter (↩) sobre la ventana resaltada
+            Si Mission Control sigue abierto, cerralo con Esc. Después volvé acá.
+            """
         ))
-        await console.waitForReturn(t("Press Return here when you are back.", "Presioná Return acá cuando vuelvas."))
-        report.nativeKeys["arrowsMoveSelection"] = await answer(t("Did the arrow keys move a highlight between windows?", "¿Las flechas movieron un resaltado entre ventanas?"))
+        await console.waitForReturn(t("Press Return (↩) here when you are back.", "Presioná Enter (↩) acá cuando vuelvas."))
         report.nativeKeys["tabDidSomething"] = await answer(t("Did Tab do anything visible?", "¿Tab hizo algo visible?"))
         report.nativeKeys["spaceShowedPreview"] = await answer(t("Did Space enlarge or preview a window?", "¿Espacio agrandó o previsualizó una ventana?"))
-        report.nativeKeys["returnOpenedWindow"] = await answer(t("Did Return open a window?", "¿Return abrió una ventana?"))
+        report.nativeKeys["arrowsMoveSelection"] = await answer(t("Did the arrow keys move a highlight between windows, without the mouse?", "¿Las flechas movieron un resaltado entre ventanas, sin usar el mouse?"))
+        report.nativeKeys["returnOpenedWindow"] = await answer(t("Did Return (↩) close Mission Control and open the highlighted window?", "¿Enter (↩) cerró Mission Control y abrió la ventana resaltada?"))
         phase = .idle
     }
 
     private func stepDemo() async {
         phase = .demo
-        console.title(t("Step 4/4 · Tabby demo", "Paso 4/4 · Demo de Tabby"))
+        console.title(t("Step 5/5 · Tabby demo", "Paso 5/5 · Demo de Tabby"))
         console.say(t(
             """
-            Now Tabby takes over Tab and Return while Mission Control is open.
+            Now Tabby takes over Tab and Return (↩) while Mission Control is open.
             Repeat at least 6 times:
               1. Open Mission Control.
-              2. Press Tab a few times (⇧Tab goes back). Tabby highlights a window.
-              3. Press Return to jump to it.
+              2. Press Tab a few times (⇧Tab goes back). Tabby shows the selected window in a bar at the bottom.
+              3. Press Return (↩) to jump to it.
             At least once, pick a window that overlaps another window of the same app.
             Esc cancels. Each result is printed here.
             """,
             """
-            Ahora Tabby toma Tab y Return mientras Mission Control está abierto.
+            Ahora Tabby toma Tab y Enter (↩) mientras Mission Control está abierto.
             Repetí al menos 6 veces:
               1. Abrí Mission Control.
-              2. Presioná Tab varias veces (⇧Tab vuelve). Tabby resalta una ventana.
-              3. Presioná Return para ir a esa ventana.
+              2. Presioná Tab varias veces (⇧Tab vuelve). Tabby muestra la ventana elegida en una barra abajo.
+              3. Presioná Enter (↩) para ir a esa ventana.
             Al menos una vez, elegí una ventana que esté encima de otra de la misma app.
             Esc cancela. Cada resultado aparece acá.
             """
         ))
-        await console.waitForReturn(t("When you are done, come back to Terminal and press Return here.", "Cuando termines, volvé a Terminal y presioná Return acá."))
+        await console.waitForReturn(t("When you are done, come back to Terminal and press Return (↩) here.", "Cuando termines, volvé a Terminal y presioná Enter (↩) acá."))
         endSession(reason: "stepEnded")
         phase = .idle
-        guard !report.sessions.isEmpty else { return }
+        guard !report.sessions.isEmpty else {
+            console.say(t("No Mission Control session was detected during the demo.", "No se detectó ninguna sesión de Mission Control durante la demo."))
+            return
+        }
         report.answers["sawHUD"] = await answer(t("While Mission Control was open, did you see Tabby's bar at the bottom?", "Con Mission Control abierto, ¿viste la barra de Tabby abajo?"))
         if report.sessions.contains(where: { $0.thumbnailsFound > 0 }) {
             report.answers["sawHighlight"] = await answer(t("Did you see a colored box around the highlighted thumbnail?", "¿Viste un recuadro de color alrededor de la miniatura resaltada?"))
             report.answers["highlightAligned"] = await answer(t("Was the box exactly on the thumbnail?", "¿El recuadro estaba justo sobre la miniatura?"))
         }
         report.answers["missionControlReactedToTab"] = await answer(t("When you pressed Tab, did Mission Control itself also react?", "Cuando presionaste Tab, ¿Mission Control también reaccionó por su cuenta?"))
-        report.answers["landedOnHighlighted"] = await answer(t("After Return, did you land on the window Tabby had highlighted?", "Después de Return, ¿terminaste en la ventana que Tabby había resaltado?"))
+        report.answers["landedOnHighlighted"] = await answer(t("After Return (↩), did you land on the window Tabby had shown?", "Después de Enter (↩), ¿terminaste en la ventana que mostraba Tabby?"))
+        report.answers["keyboardFeltSlow"] = await answer(t("Did the keyboard or the Mac feel slow during the test?", "¿El teclado o la Mac se sintieron lentos durante la prueba?"))
     }
 
     private func answer(_ question: String) async -> String {
@@ -251,13 +340,14 @@ final class ProbeRunner {
     }
 
     private func handle(_ event: MissionControlEvent, at instant: ContinuousClock.Instant) {
+        notificationsSeen = true
         report.events.append(.init(name: event.rawValue, atMs: milliseconds(from: startedAt, to: instant), phase: phase.rawValue))
         log.info("event \(event.rawValue, privacy: .public) phase \(self.phase.rawValue, privacy: .public)")
         switch event {
         case .showAllWindows:
             missionControlOpen = true
             console.say("  ● " + t("Mission Control opened", "Mission Control abierto"))
-            missionControlOpened(at: instant)
+            missionControlOpened(at: instant, detectedBy: "notification")
         case .exit:
             missionControlOpen = false
             console.say("  ○ " + t("Mission Control closed", "Mission Control cerrado"))
@@ -267,10 +357,10 @@ final class ProbeRunner {
         }
     }
 
-    private func missionControlOpened(at instant: ContinuousClock.Instant) {
+    private func missionControlOpened(at instant: ContinuousClock.Instant, detectedBy source: String) {
         switch phase {
         case .detection:
-            if let key = lastKeyDown, instant - key.at < .milliseconds(1500) {
+            if let key = lastKeyDown, instant - key.at < .milliseconds(1500), instant > key.at {
                 let latency = milliseconds(from: key.at, to: instant)
                 report.triggers.append(.init(keyCode: Int(key.code), modifiers: key.modifiers.symbols, latencyMs: latency))
                 console.say("    " + t("latency from the key press: \(Int(latency)) ms", "latencia desde la tecla: \(Int(latency)) ms"))
@@ -278,10 +368,14 @@ final class ProbeRunner {
             if !dumpedDuringDetection {
                 dumpedDuringDetection = true
                 scheduleTreeDumps()
-                scheduleWindowSnapshotDuringMissionControl()
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .milliseconds(500))
+                    guard let self, self.missionControlOpen else { return }
+                    self.captureWindowsDuringMissionControl()
+                }
             }
         case .demo:
-            startSession()
+            startSession(detectedBy: source)
         case .idle, .nativeKeys:
             break
         }
@@ -323,23 +417,19 @@ final class ProbeRunner {
         ))
     }
 
-    private func scheduleWindowSnapshotDuringMissionControl() {
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard let self, self.missionControlOpen else { return }
-            let started = ContinuousClock().now
-            let windows = self.provider.snapshot()
-            let elapsed = self.milliseconds(from: started, to: ContinuousClock().now)
-            self.report.windowsDuringMissionControl = .init(
-                windows: windows,
-                diagnostics: self.provider.lastDiagnostics,
-                reference: self.referenceWindowIDs,
-                snapshotMs: elapsed
-            )
-        }
+    private func captureWindowsDuringMissionControl() {
+        let started = ContinuousClock().now
+        let windows = provider.snapshot()
+        let elapsed = milliseconds(from: started, to: ContinuousClock().now)
+        report.windowsDuringMissionControl = .init(
+            windows: windows,
+            diagnostics: provider.lastDiagnostics,
+            reference: referenceWindowIDs,
+            snapshotMs: elapsed
+        )
     }
 
-    private func startSession() {
+    private func startSession(detectedBy source: String) {
         endSession(reason: "replaced")
         let started = ContinuousClock().now
         let windows = provider.snapshot()
@@ -348,7 +438,13 @@ final class ProbeRunner {
         engine = NavigationEngine(windowIDs: windows.map(\.id))
         thumbnails = [:]
         sessionKeys = [:]
-        report.sessions.append(.init(index: report.sessions.count + 1, windows: windows.count, snapshotMs: snapshotMs, secureInput: SystemStatus.secureInputEnabled))
+        report.sessions.append(.init(
+            index: report.sessions.count + 1,
+            detectedBy: source,
+            windows: windows.count,
+            snapshotMs: snapshotMs,
+            secureInput: SystemStatus.secureInputEnabled
+        ))
         interceptor.setMode(.intercept)
         resolveThumbnails()
         render()
@@ -494,12 +590,14 @@ final class ProbeRunner {
     }
 
     private func finish() {
+        pollTask?.cancel()
         observer.stop()
         interceptor.setMode(.off)
         overlay.hide()
         report.finishedAt = Date()
         report.permissions = ProbeReport.Permissions()
-        report.tapDisabledBySystem = interceptor.systemDisableCount
+        report.tapTimeouts = interceptor.timeoutCount
+        interceptor.uninstall()
         report.verdicts = ProbeReport.verdicts(for: report)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -517,25 +615,17 @@ final class ProbeRunner {
 
     private func dumpOnly() async -> Int32 {
         guard ensureAccessibility() else { return 2 }
-        observer.onEvent = { [weak self] event, _ in
-            guard let self, event == .showAllWindows else { return }
-            self.missionControlOpen = true
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(400))
-                guard let self else { return }
-                self.saveDockTree(label: "manual")
-                self.dumpFinished.push(true)
-            }
+        console.say(t(
+            "Open Mission Control now and leave it open. The Dock tree is saved in 5 seconds.",
+            "Abrí Mission Control ahora y dejalo abierto. El árbol del Dock se guarda en 5 segundos."
+        ))
+        for remaining in stride(from: 5, through: 1, by: -1) {
+            console.say("  \(remaining)…")
+            try? await Task.sleep(for: .seconds(1))
         }
-        guard observer.start() != nil else {
-            console.say(t("Could not observe the Dock.", "No pude observar el Dock."))
-            return 1
-        }
-        console.say(t("Open Mission Control now (60 s limit).", "Abrí Mission Control ahora (60 s de límite)."))
-        let done = await dumpFinished.next(timeout: .seconds(60))
-        observer.stop()
-        console.say(done == true ? outputDirectory.path : t("Timed out.", "Se agotó el tiempo."))
-        return done == true ? 0 : 1
+        saveDockTree(label: "manual")
+        console.say(outputDirectory.path)
+        return 0
     }
 
     private func milliseconds(from start: ContinuousClock.Instant, to end: ContinuousClock.Instant) -> Double {

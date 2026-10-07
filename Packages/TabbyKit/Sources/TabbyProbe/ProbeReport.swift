@@ -43,6 +43,7 @@ struct ProbeReport: Codable {
         var name: String
         var atMs: Double
         var phase: String
+        var detail: String?
     }
 
     struct Trigger: Codable {
@@ -62,6 +63,7 @@ struct ProbeReport: Codable {
 
     struct Session: Codable {
         var index: Int
+        var detectedBy: String
         var windows: Int
         var snapshotMs: Double
         var thumbnailsFound = 0
@@ -82,7 +84,7 @@ struct ProbeReport: Codable {
         var detail: [String: String]
     }
 
-    var tool = "tabby-probe 0.1"
+    var tool = "tabby-probe 0.2"
     var startedAt = Date()
     var finishedAt: Date?
     var macOS = SystemStatus.macOSVersion
@@ -91,7 +93,8 @@ struct ProbeReport: Codable {
     var screens: [Screen] = []
     var observerRegistration: [String: String] = [:]
     var tapInstalled = false
-    var tapDisabledBySystem = 0
+    var tapTimeouts = 0
+    var dockBaseline: [String] = []
     var windowsBefore = WindowSummary()
     var windowsDuringMissionControl = WindowSummary()
     var events: [Event] = []
@@ -107,11 +110,21 @@ struct ProbeReport: Codable {
 extension ProbeReport {
     static func verdicts(for report: ProbeReport) -> [String: String] {
         var verdicts: [String: String] = [:]
-        let opens = report.events.filter { $0.phase == "detection" && $0.name == MissionControlEvent.showAllWindows.rawValue }.count
-        let exits = report.events.filter { $0.phase == "detection" && $0.name == MissionControlEvent.exit.rawValue }.count
+        let detection = report.events.filter { $0.phase == "detection" }
+        let opens = detection.filter { $0.name == MissionControlEvent.showAllWindows.rawValue }.count
+        let exits = detection.filter { $0.name == MissionControlEvent.exit.rawValue }.count
+        let dockChanges = report.events.filter { $0.name == "dockTreeExpanded" }.count
         let registered = report.observerRegistration[MissionControlEvent.showAllWindows.rawValue] == "success"
             && report.observerRegistration[MissionControlEvent.exit.rawValue] == "success"
-        verdicts["H1 detection"] = registered && opens >= 4 && exits >= opens ? "pass (\(opens) opens)" : (opens > 0 ? "partial (\(opens) opens, \(exits) exits)" : "fail")
+        if registered && opens >= 4 && exits >= opens {
+            verdicts["H1 detection"] = "pass (\(opens) opens)"
+        } else if opens > 0 {
+            verdicts["H1 detection"] = "partial (\(opens) opens, \(exits) exits)"
+        } else if dockChanges > 0 {
+            verdicts["H1 detection"] = "notifications silent; Dock tree fallback saw \(dockChanges) openings"
+        } else {
+            verdicts["H1 detection"] = "fail"
+        }
 
         let before = report.windowsBefore
         let during = report.windowsDuringMissionControl
@@ -131,11 +144,17 @@ extension ProbeReport {
         let keys = report.sessions.reduce(0) { $0 + $1.keys.values.reduce(0, +) }
         let nativeReaction = report.answers["missionControlReactedToTab"]
         verdicts["H7 keyboard"] = report.tapInstalled && keys > 0 && nativeReaction == "no"
-            ? "pass (\(keys) keys)" : (report.tapInstalled ? "review (\(keys) keys, native=\(nativeReaction ?? "unknown"))" : "fail")
+            ? "pass (\(keys) keys, \(report.tapTimeouts) tap timeouts)"
+            : (report.tapInstalled ? "review (\(keys) keys, native=\(nativeReaction ?? "unknown"), \(report.tapTimeouts) tap timeouts)" : "fail")
 
         let diagnostics = before.diagnostics
-        verdicts["H8 window id"] = report.privateWindowAPI && diagnostics.candidates > 0 && diagnostics.matchedByPrivateAPI == diagnostics.candidates
-            ? "pass" : (report.privateWindowAPI ? "partial (\(diagnostics.matchedByPrivateAPI)/\(diagnostics.candidates))" : "fail")
+        if report.privateWindowAPI, before.count > 0, diagnostics.matchedByPrivateAPI >= before.count, diagnostics.matchedByFrame == 0 {
+            verdicts["H8 window id"] = "pass (\(diagnostics.matchedByPrivateAPI) matched; \(diagnostics.unmatched) window-server-only windows ignored)"
+        } else {
+            verdicts["H8 window id"] = report.privateWindowAPI
+                ? "partial (\(diagnostics.matchedByPrivateAPI) private, \(diagnostics.matchedByFrame) by frame, \(diagnostics.unmatched) unmatched)"
+                : "fail"
+        }
 
         verdicts["H9 move to desktop"] = "pending"
         verdicts["H0 native keys"] = report.nativeKeys.isEmpty ? "unknown" : report.nativeKeys.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: ", ")
@@ -154,7 +173,8 @@ extension ProbeReport {
             "",
             "- macOS: \(macOS)",
             "- Accessibility: \(permissions.accessibility) · Input Monitoring: \(permissions.inputMonitoring) · Secure input: \(permissions.secureInput)",
-            "- _AXUIElementGetWindow: \(privateWindowAPI) · Keyboard tap: \(tapInstalled) · Tap disabled by system: \(tapDisabledBySystem)",
+            "- _AXUIElementGetWindow: \(privateWindowAPI) · Keyboard tap: \(tapInstalled) · Tap timeouts: \(tapTimeouts)",
+            "- Dock top level at start: \(dockBaseline.joined(separator: ", "))",
             "",
             "| Hypothesis | Result |",
             "|---|---|",

@@ -7,8 +7,7 @@ public enum NavigationKey: String, Codable, Sendable {
     case select
 }
 
-@MainActor
-public final class KeyboardInterceptor {
+public final class KeyboardInterceptor: @unchecked Sendable {
     public enum Mode: Sendable {
         case off
         case observe
@@ -36,25 +35,104 @@ public final class KeyboardInterceptor {
         }
     }
 
-    public var bindings: Bindings
-    public var onKey: (@MainActor (NavigationKey) -> Void)?
-    public var onKeyDown: (@MainActor (UInt16, ModifierSet) -> Void)?
-    public private(set) var mode: Mode = .off
-    public private(set) var isInstalled = false
-    public private(set) var systemDisableCount = 0
+    public typealias KeyHandler = @MainActor @Sendable (NavigationKey) -> Void
+    public typealias KeyDownHandler = @MainActor @Sendable (UInt16, ModifierSet, ContinuousClock.Instant) -> Void
 
-    private var tap: CFMachPort?
-    private var source: CFRunLoopSource?
+    private let lock = NSLock()
+    private var currentMode: Mode = .off
+    private var currentBindings: Bindings
+    private var keyHandler: KeyHandler?
+    private var keyDownHandler: KeyDownHandler?
     private var swallowed: Set<UInt16> = []
     private var drainGeneration = 0
+    private var timeouts = 0
+    private var tap: CFMachPort?
+    private var runLoop: CFRunLoop?
 
     public init(bindings: Bindings = .standard) {
-        self.bindings = bindings
+        currentBindings = bindings
+    }
+
+    public var mode: Mode {
+        locked { currentMode }
+    }
+
+    public var isInstalled: Bool {
+        locked { tap != nil }
+    }
+
+    public var timeoutCount: Int {
+        locked { timeouts }
+    }
+
+    public var bindings: Bindings {
+        get { locked { currentBindings } }
+        set { locked { currentBindings = newValue } }
+    }
+
+    public var onKey: KeyHandler? {
+        get { locked { keyHandler } }
+        set { locked { keyHandler = newValue } }
+    }
+
+    public var onKeyDown: KeyDownHandler? {
+        get { locked { keyDownHandler } }
+        set { locked { keyDownHandler = newValue } }
     }
 
     @discardableResult
     public func install() -> Bool {
-        guard tap == nil else { return true }
+        if isInstalled { return true }
+        let ready = DispatchSemaphore(value: 0)
+        let thread = Thread { [weak self] in
+            guard let self else {
+                ready.signal()
+                return
+            }
+            self.runTapLoop(ready: ready)
+        }
+        thread.name = "io.github.cristiandjr.tabby.event-tap"
+        thread.qualityOfService = .userInteractive
+        thread.start()
+        ready.wait()
+        return isInstalled
+    }
+
+    public func uninstall() {
+        let (port, loop) = locked { () -> (CFMachPort?, CFRunLoop?) in
+            defer {
+                tap = nil
+                runLoop = nil
+                currentMode = .off
+                swallowed.removeAll()
+            }
+            return (tap, runLoop)
+        }
+        if let port {
+            CGEvent.tapEnable(tap: port, enable: false)
+            CFMachPortInvalidate(port)
+        }
+        if let loop {
+            CFRunLoopStop(loop)
+        }
+    }
+
+    public func setMode(_ newMode: Mode) {
+        let (port, enable, generation) = locked { () -> (CFMachPort?, Bool, Int) in
+            currentMode = newMode
+            drainGeneration += 1
+            return (tap, newMode != .off || !swallowed.isEmpty, drainGeneration)
+        }
+        guard let port else { return }
+        CGEvent.tapEnable(tap: port, enable: enable)
+        if newMode == .off, enable {
+            DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.finishDrain(generation: generation)
+            }
+        }
+    }
+
+    private func runTapLoop(ready: DispatchSemaphore) {
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.keyUp.rawValue)
         guard let port = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -64,70 +142,92 @@ public final class KeyboardInterceptor {
             callback: { _, type, event, refcon in
                 guard let refcon else { return Unmanaged.passUnretained(event) }
                 let interceptor = Unmanaged<KeyboardInterceptor>.fromOpaque(refcon).takeUnretainedValue()
-                let typeRaw = type.rawValue
-                let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
-                let flagsRaw = event.flags.rawValue
-                let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-                let consume = MainActor.assumeIsolated {
-                    interceptor.process(typeRaw: typeRaw, keyCode: keyCode, flagsRaw: flagsRaw, isRepeat: isRepeat)
-                }
-                return consume ? nil : Unmanaged.passUnretained(event)
+                return interceptor.handle(type: type, event: event) ? nil : Unmanaged.passUnretained(event)
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
-        ) else { return false }
-        let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0)
-        CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
-        CGEvent.tapEnable(tap: port, enable: false)
-        tap = port
-        source = runLoopSource
-        isInstalled = true
-        return true
-    }
-
-    public func setMode(_ newMode: Mode) {
-        mode = newMode
-        drainGeneration += 1
-        if newMode == .off, !swallowed.isEmpty {
-            let generation = drainGeneration
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(500))
-                guard let self, self.drainGeneration == generation else { return }
-                self.swallowed.removeAll()
-                self.updateTap()
-            }
+        ) else {
+            ready.signal()
+            return
         }
-        updateTap()
+        CGEvent.tapEnable(tap: port, enable: false)
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0)
+        let loop = CFRunLoopGetCurrent()
+        CFRunLoopAddSource(loop, source, .commonModes)
+        locked {
+            tap = port
+            runLoop = loop
+        }
+        ready.signal()
+        CFRunLoopRun()
     }
 
-    private func updateTap() {
-        guard let tap else { return }
-        CGEvent.tapEnable(tap: tap, enable: mode != .off || !swallowed.isEmpty)
-    }
-
-    private func process(typeRaw: UInt32, keyCode: UInt16, flagsRaw: UInt64, isRepeat: Bool) -> Bool {
-        guard let type = CGEventType(rawValue: typeRaw) else { return false }
+    private func handle(type: CGEventType, event: CGEvent) -> Bool {
         switch type {
-        case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            systemDisableCount += 1
-            updateTap()
+        case .tapDisabledByTimeout:
+            let (port, enable) = locked { () -> (CFMachPort?, Bool) in
+                timeouts += 1
+                return (tap, currentMode != .off || !swallowed.isEmpty)
+            }
+            if enable, let port {
+                CGEvent.tapEnable(tap: port, enable: true)
+            }
+            return false
+        case .tapDisabledByUserInput:
             return false
         case .keyDown:
-            let flags = CGEventFlags(rawValue: flagsRaw)
-            onKeyDown?(keyCode, ModifierSet(flags))
-            guard mode == .intercept, let key = bindings.key(for: keyCode, flags: flags) else { return false }
-            swallowed.insert(keyCode)
-            if !(isRepeat && key == .select) {
-                Task { @MainActor [weak self] in
-                    self?.onKey?(key)
+            let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
+            let flags = event.flags
+            let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+            let now = ContinuousClock().now
+            let (keyDown, handler, key) = locked { () -> (KeyDownHandler?, KeyHandler?, NavigationKey?) in
+                guard currentMode == .intercept, let key = currentBindings.key(for: keyCode, flags: flags) else {
+                    return (keyDownHandler, nil, nil)
+                }
+                swallowed.insert(keyCode)
+                return (keyDownHandler, keyHandler, key)
+            }
+            if let keyDown {
+                let modifiers = ModifierSet(flags)
+                Task { @MainActor in
+                    keyDown(keyCode, modifiers, now)
+                }
+            }
+            guard let key else { return false }
+            if let handler, !(isRepeat && key == .select) {
+                Task { @MainActor in
+                    handler(key)
                 }
             }
             return true
         case .keyUp:
-            guard swallowed.remove(keyCode) != nil else { return false }
-            if mode == .off { updateTap() }
-            return true
+            let keyCode = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
+            let (consumed, portToDisable) = locked { () -> (Bool, CFMachPort?) in
+                guard swallowed.remove(keyCode) != nil else { return (false, nil) }
+                return (true, currentMode == .off && swallowed.isEmpty ? tap : nil)
+            }
+            if let portToDisable {
+                CGEvent.tapEnable(tap: portToDisable, enable: false)
+            }
+            return consumed
         default:
             return false
         }
+    }
+
+    private func finishDrain(generation: Int) {
+        let port = locked { () -> CFMachPort? in
+            guard drainGeneration == generation, currentMode == .off else { return nil }
+            swallowed.removeAll()
+            return tap
+        }
+        if let port {
+            CGEvent.tapEnable(tap: port, enable: false)
+        }
+    }
+
+    private func locked<T>(_ body: () throws -> T) rethrows -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try body()
     }
 }

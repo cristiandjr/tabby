@@ -39,6 +39,16 @@ public enum DockAccessibility {
     }
 
     @MainActor
+    public static func topLevelSignature() -> [String] {
+        guard let pid else { return [] }
+        return AX.elements(AX.application(pid), kAXChildrenAttribute).map { child in
+            let role = AX.string(child, kAXRoleAttribute) ?? "?"
+            let identifier = AX.string(child, identifierAttribute).map { ":\($0)" } ?? ""
+            return role + identifier
+        }
+    }
+
+    @MainActor
     public static func pressableCandidates(maxDepth: Int = 16, maxNodes: Int = 4000) -> [DockCandidate] {
         guard let pid else { return [] }
         var candidates: [DockCandidate] = []
