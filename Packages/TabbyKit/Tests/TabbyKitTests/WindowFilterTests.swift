@@ -1,0 +1,49 @@
+import CoreGraphics
+import Foundation
+import Testing
+@testable import TabbyKit
+
+@Suite("WindowFilter")
+struct WindowFilterTests {
+    private func record(id: CGWindowID, pid: pid_t = 100, layer: Int = 0, alpha: Double = 1, size: CGFloat = 400) -> CGWindowRecord {
+        CGWindowRecord(id: id, pid: pid, ownerName: "App", layer: layer, alpha: alpha, bounds: CGRect(x: 0, y: 0, width: size, height: size))
+    }
+
+    @Test func keepsNormalWindowsInOrder() {
+        let records = [record(id: 1), record(id: 2)]
+        #expect(WindowFilter.candidates(records).map(\.id) == [1, 2])
+    }
+
+    @Test func dropsWindowsOutsideTheNormalLayer() {
+        #expect(WindowFilter.candidates([record(id: 1, layer: 25)]).isEmpty)
+    }
+
+    @Test func dropsTransparentWindows() {
+        #expect(WindowFilter.candidates([record(id: 1, alpha: 0)]).isEmpty)
+    }
+
+    @Test func dropsTinyWindows() {
+        #expect(WindowFilter.candidates([record(id: 1, size: 20)]).isEmpty)
+    }
+
+    @Test func dropsExcludedProcesses() {
+        let records = [record(id: 1, pid: 7), record(id: 2, pid: 8)]
+        #expect(WindowFilter.candidates(records, excluding: [7]).map(\.id) == [2])
+    }
+
+    @Test func parsesWindowServerDictionaries() {
+        let dictionary: [String: Any] = [
+            kCGWindowNumber as String: NSNumber(value: 42),
+            kCGWindowOwnerPID as String: NSNumber(value: 314),
+            kCGWindowOwnerName as String: "Finder",
+            kCGWindowLayer as String: NSNumber(value: 0),
+            kCGWindowAlpha as String: NSNumber(value: 1.0),
+            kCGWindowBounds as String: CGRect(x: 10, y: 20, width: 800, height: 600).dictionaryRepresentation,
+        ]
+        let parsed = CGWindowRecord(dictionary: dictionary)
+        #expect(parsed?.id == 42)
+        #expect(parsed?.pid == 314)
+        #expect(parsed?.ownerName == "Finder")
+        #expect(parsed?.bounds == CGRect(x: 10, y: 20, width: 800, height: 600))
+    }
+}
