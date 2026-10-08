@@ -70,7 +70,7 @@ There is no release yet. When v0.1 is ready, Tabby will be a single download, wi
 
 1. Download **Tabby.zip** from [Releases](https://github.com/cristiandjr/tabby/releases) and open it.
 2. Open **Tabby.app**. Tabby isn't notarized yet, so macOS blocks it the first time: go to **System Settings → Privacy & Security** and click **Open Anyway**.
-3. Grant **Accessibility** permission when asked.
+3. A short welcome tour guides you through the **Accessibility** permission and a first try.
 4. Optional: move Tabby to **Applications**. You only need this for *Launch at Login*.
 
 ### Privacy
@@ -101,7 +101,14 @@ open build/Tabby.app
 | `TabbyApp` | The menu bar app, bundled by `scripts/build-app.sh`. |
 | `tabby-probe` | Guided diagnostic tool that checks what your macOS version allows. See [docs/spikes](docs/spikes/README.md). |
 
-Ideas, issues and pull requests are welcome. If you like the project, a ⭐ helps a lot.
+Ideas, issues and pull requests are welcome. If something doesn't work, open **Diagnostics…** in the menu, copy the report and paste it in the issue.
+
+### Support Tabby
+
+Tabby is free and open source, made with ❤️ in Argentina 🇦🇷. If it saves you time every day, you can buy me a coffee: every contribution helps add features and keep Tabby up to date with each new macOS.
+
+- **Mercado Pago** alias: `cristiandjr.mp`
+- Starring the repo ⭐ and sharing Tabby with a friend helps a lot too.
 
 ### License
 
@@ -158,7 +165,7 @@ Todavía no hay versiones publicadas. Cuando esté lista la v0.1, Tabby será un
 
 1. Descarga **Tabby.zip** desde [Releases](https://github.com/cristiandjr/tabby/releases) y ábrelo.
 2. Abre **Tabby.app**. Como todavía no está notarizada, macOS la bloquea la primera vez: ve a **Configuración del Sistema → Privacidad y seguridad** y haz clic en **Abrir igualmente**.
-3. Da el permiso de **Accesibilidad** cuando lo pida.
+3. Una bienvenida corta te guía con el permiso de **Accesibilidad** y una primera prueba.
 4. Opcional: mueve Tabby a **Aplicaciones**. Solo hace falta para *Abrir al iniciar sesión*.
 
 ### Privacidad
@@ -189,7 +196,14 @@ open build/Tabby.app
 | `TabbyApp` | La app de barra de menús, empaquetada por `scripts/build-app.sh`. |
 | `tabby-probe` | Herramienta de diagnóstico guiada que comprueba qué permite tu versión de macOS. Ver [docs/spikes](docs/spikes/README.md). |
 
-Las ideas, los issues y los pull requests son bienvenidos. Si te gusta el proyecto, una ⭐ ayuda muchísimo.
+Las ideas, los issues y los pull requests son bienvenidos. Si algo no funciona, abre **Diagnóstico…** en el menú, copia el reporte y pégalo en el issue.
+
+### Apoya a Tabby
+
+Tabby es gratis y de código abierto, hecho con ❤️ en Argentina 🇦🇷. Si te ahorra tiempo todos los días, puedes invitarme un café: cada aporte ayuda a sumar funciones y a mantener Tabby al día con cada macOS nuevo.
+
+- Alias de **Mercado Pago**: `cristiandjr.mp`
+- Dejar una ⭐ en el repo y compartir Tabby con alguien también ayuda muchísimo.
 
 ### Licencia
 

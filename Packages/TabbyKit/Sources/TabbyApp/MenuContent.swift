@@ -22,6 +22,9 @@ struct MenuContent: View {
             model.showSettings(using: openSettings)
         }
         .keyboardShortcut(",")
+        Button(localized("Diagnostics…", "Diagnóstico…")) {
+            model.showDiagnostics()
+        }
         Divider()
         Button(localized("Open Mission Control", "Abrir Mission Control")) {
             model.openMissionControl()

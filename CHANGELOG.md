@@ -17,6 +17,9 @@ First preview build.
 - <kbd>⌘</kbd><kbd>1</kbd>…<kbd>⌘</kbd><kbd>9</kbd> inside Mission Control sends the selected window to that desktop of the current display. Missing desktops are created up to that number, and Mission Control stays open so you can keep sorting.
 - Works however you open Mission Control: keyboard shortcut, F3, trackpad gesture or hot corner.
 - Moving the mouse hands the selection back to Mission Control's own hover highlight.
+- A welcome tour on first launch: Accessibility permission (detected as soon as you grant it), a first try with Mission Control, the optional lift effect and the shortcuts.
+- Diagnostics window with a copyable report for bug reports. It has no window titles, keystrokes or personal data.
+- About with a way to support the project (Mercado Pago, made in Argentina 🇦🇷).
 - Settings window (<kbd>⌘</kbd><kbd>,</kbd>): pause, launch at login, lift effect, permissions, and custom shortcuts with a recorder. Invalid shortcuts are never saved, and Tabby warns about macOS's own desktop shortcuts.
 
 ### Known issues

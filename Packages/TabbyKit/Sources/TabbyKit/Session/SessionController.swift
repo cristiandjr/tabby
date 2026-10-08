@@ -27,6 +27,14 @@ public final class SessionController {
         return session.thumbnails[id] != nil
     }
 
+    public var keyboardTapInstalled: Bool {
+        dependencies.keyboard.isInstalled
+    }
+
+    public var keyboardTapTimeouts: Int {
+        dependencies.keyboard.timeoutCount
+    }
+
     private let dependencies: SessionDependencies
     private var detector = MissionControlDetector()
     private var tracker = HighlightTracker()

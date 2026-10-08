@@ -11,7 +11,7 @@ struct SettingsView: View {
                 .tabItem { Label(localized("General", "General"), systemImage: "gearshape") }
             ShortcutsSettings(model: model)
                 .tabItem { Label(localized("Shortcuts", "Atajos"), systemImage: "keyboard") }
-            AboutSettings(model: model)
+            AboutView(version: model.version)
                 .tabItem { Label(localized("About", "Acerca de"), systemImage: "info.circle") }
         }
         .frame(width: 520)
@@ -26,6 +26,20 @@ private struct GeneralSettings: View {
             Section {
                 Toggle(localized("Enabled", "Activado"), isOn: $model.isEnabled)
                 Toggle(localized("Launch at login", "Abrir al iniciar sesión"), isOn: $model.launchesAtLogin)
+                    .disabled(model.isTranslocated)
+            } footer: {
+                if model.isTranslocated {
+                    Text(localized(
+                        "To launch at login, move Tabby to Applications and open it again.",
+                        "Para abrir al iniciar sesión, mové Tabby a Aplicaciones y abrila de nuevo."
+                    ))
+                    .foregroundStyle(.secondary)
+                }
+            }
+            Section {
+                Button(localized("Show the welcome tour", "Ver la bienvenida")) {
+                    model.showOnboarding()
+                }
             }
             Section {
                 Toggle(localized("Lift the selected window", "Agrandar la ventana seleccionada"), isOn: $model.liftsSelection)
@@ -123,30 +137,6 @@ private struct ShortcutsSettings: View {
                 "\(KeyLabels.describe(combo)) cambia de escritorio en macOS; dentro de Mission Control lo va a usar Tabby"
             )
         }
-    }
-}
-
-private struct AboutSettings: View {
-    let model: AppModel
-    private static let repository = URL(string: "https://github.com/cristiandjr/tabby")
-
-    var body: some View {
-        VStack(spacing: 10) {
-            Image(nsImage: NSApplication.shared.applicationIconImage)
-                .resizable()
-                .frame(width: 96, height: 96)
-            Text("Tabby").font(.title.bold())
-            Text(localized("Version \(model.version)", "Versión \(model.version)")).foregroundStyle(.secondary)
-            Text(localized("Navigate Mission Control with your keyboard.", "Navegá Mission Control con el teclado."))
-            if let repository = Self.repository {
-                Link("github.com/cristiandjr/tabby", destination: repository)
-            }
-            Text(localized("Free and open source · MIT license", "Gratis y de código abierto · Licencia MIT"))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding(28)
-        .frame(maxWidth: .infinity)
     }
 }
 

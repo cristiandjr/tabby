@@ -195,6 +195,11 @@ final class FakeKeyboard: KeyboardIntercepting {
     var keymap = Keymap.standard
     var modes: [KeyboardInterceptor.Mode] = []
     var installed = false
+    var timeoutCount = 0
+
+    var isInstalled: Bool {
+        installed
+    }
 
     var mode: KeyboardInterceptor.Mode {
         modes.last ?? .off

@@ -23,11 +23,18 @@ final class AppModel {
     private(set) var rejectedShortcutIssues: [ShortcutSettings.Issue] = []
     private(set) var hasAccessibility = AX.isTrusted
     private(set) var hasScreenRecording = OverlayPresenter.canCaptureWindows
+    private(set) var missionControlDetections = 0
+
+    let isTranslocated = Bundle.main.bundlePath.contains("/AppTranslocation/")
 
     @ObservationIgnored let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
 
     @ObservationIgnored private static let liftsSelectionKey = "liftsSelection"
     @ObservationIgnored private static let shortcutsKey = "shortcuts"
+    @ObservationIgnored private static let onboardingKey = "onboardingCompleted"
+    @ObservationIgnored private let onboarding = HostedWindow()
+    @ObservationIgnored private let diagnostics = HostedWindow()
+    @ObservationIgnored private var lastSession: DiagnosticsReport.Session?
     @ObservationIgnored private let presenter = OverlayPresenter()
     @ObservationIgnored private let controller: SessionController
     @ObservationIgnored private let log = Log.logger("app")
@@ -41,11 +48,94 @@ final class AppModel {
         controller.onEvent = { [weak self] event in
             self?.record(event)
         }
+        let needsOnboarding = !UserDefaults.standard.bool(forKey: Self.onboardingKey)
         if hasAccessibility {
             startIfNeeded()
         } else {
-            AX.requestTrust()
+            if !needsOnboarding {
+                AX.requestTrust()
+            }
             waitForAccessibility()
+        }
+        if needsOnboarding {
+            Task { @MainActor [weak self] in
+                self?.showOnboarding()
+            }
+        }
+    }
+
+    func showOnboarding() {
+        onboarding.show(title: "Tabby", transparentTitleBar: true, onClose: { [weak self] in
+            UserDefaults.standard.set(true, forKey: Self.onboardingKey)
+            self?.hasAccessibility = AX.isTrusted
+        }, content: {
+            OnboardingView(model: self) { [weak self] in self?.onboarding.close() }
+        })
+    }
+
+    func showDiagnostics() {
+        diagnostics.show(title: localized("Tabby Diagnostics", "Diagnóstico de Tabby")) {
+            DiagnosticsView(model: self)
+        }
+    }
+
+    func requestAccessibility() {
+        AX.requestTrust()
+        openAccessibilitySettings()
+        if permissionTask == nil {
+            waitForAccessibility()
+        }
+    }
+
+    func diagnosticsReport() -> DiagnosticsReport {
+        hasAccessibility = AX.isTrusted
+        hasScreenRecording = OverlayPresenter.canCaptureWindows
+        let shortcuts = shortcuts
+        return DiagnosticsReport(
+            appVersion: version,
+            build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "dev",
+            macOS: SystemStatus.macOSVersion.replacingOccurrences(of: "Version ", with: ""),
+            architecture: Self.architecture,
+            displays: NSScreen.screens.map { .init(width: Int($0.frame.width), height: Int($0.frame.height), scale: $0.backingScaleFactor) },
+            accessibility: hasAccessibility,
+            screenRecording: hasScreenRecording,
+            postEvents: SystemStatus.postEventAccess,
+            listenEvents: SystemStatus.listenEventAccess,
+            secureInput: SystemStatus.secureInputEnabled,
+            privateWindowAPI: PrivateAXBridge.isAvailable,
+            enabled: isEnabled,
+            running: controller.isRunning,
+            keyboardTap: controller.keyboardTapInstalled,
+            tapTimeouts: controller.keyboardTapTimeouts,
+            shortcuts: [
+                "next \(KeyLabels.describe(shortcuts.next))",
+                "previous \(KeyLabels.describe(shortcuts.previous))",
+                "go \(KeyLabels.describe(shortcuts.activate))",
+                "move \(shortcuts.moveModifiers.symbols)1…9",
+            ],
+            liftSetting: liftsSelection,
+            reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+            translocated: isTranslocated,
+            launchAtLogin: Self.launchAtLoginStatus,
+            lastSession: lastSession
+        )
+    }
+
+    private static var architecture: String {
+        #if arch(arm64)
+        "Apple Silicon"
+        #else
+        "Intel"
+        #endif
+    }
+
+    private static var launchAtLoginStatus: String {
+        switch SMAppService.mainApp.status {
+        case .enabled: "enabled"
+        case .notRegistered: "not registered"
+        case .requiresApproval: "requires approval"
+        case .notFound: "not found"
+        @unknown default: "unknown"
         }
     }
 
@@ -166,6 +256,7 @@ final class AppModel {
                 guard let self else { return }
                 if AX.isTrusted {
                     self.hasAccessibility = true
+                    self.permissionTask = nil
                     self.startIfNeeded()
                     return
                 }
@@ -177,10 +268,14 @@ final class AppModel {
         switch event {
         case .opened(let windows):
             hasScreenRecording = OverlayPresenter.canCaptureWindows
+            missionControlDetections += 1
+            lastSession = DiagnosticsReport.Session(windows: windows, thumbnails: controller.matchedThumbnails)
             log.info("mission control opened with \(windows) windows")
         case .activated(_, let result):
+            lastSession?.activation = result
             log.info("activated exact=\(result.exact) strategy=\(result.strategy.rawValue, privacy: .public) in \(Int(result.elapsed / .milliseconds(1)))ms")
         case .moved(_, let desktop, let result):
+            lastSession?.move = result
             log.info("moved to desktop \(desktop) result=\(String(describing: result), privacy: .public)")
         case .selected, .closed:
             break

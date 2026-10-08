@@ -21,6 +21,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINARY" "$APP/Contents/MacOS/Tabby"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" App/Info.plist > "$APP/Contents/Info.plist"
 cp App/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp docs/assets/logo-dark.png "$APP/Contents/Resources/Logo-dark.png"
+cp docs/assets/logo-light.png "$APP/Contents/Resources/Logo-light.png"
 
 if security find-identity -p codesigning | grep -q "\"$IDENTITY\""; then
     codesign --force --options runtime --sign "$IDENTITY" "$APP"
