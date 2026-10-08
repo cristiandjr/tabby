@@ -32,5 +32,6 @@ public struct SelectionPresentation: Equatable, Sendable {
 public protocol SelectionPresenting: AnyObject {
     func prepare(for windows: [MissionWindow])
     func present(_ presentation: SelectionPresentation)
+    func showNotice(_ text: String)
     func dismiss()
 }

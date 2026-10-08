@@ -63,6 +63,7 @@ extension SessionDependencies {
             windows: windows,
             thumbnails: LiveThumbnailProvider(),
             activator: ActivationCoordinator(system: LiveActivationSystem(windows: windows)),
+            mover: SpaceMover(system: LiveSpaceSystem()),
             presenter: presenter ?? OverlayPresenter(),
             keyboard: KeyboardInterceptor(),
             pointer: LivePointerMonitor(),

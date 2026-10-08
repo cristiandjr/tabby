@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-07 · **macOS:** 27.0.1 (26A434) · **Hardware:** Apple Silicon MacBook Pro, built-in display + external 1920×1080 display
 
-**Recommendation: GO, full capability level.** Every capability Tabby needs works with public APIs plus `_AXUIElementGetWindow`. Moving windows to another desktop (H9) is still to be tested, and it does not block v0.1.
+**Recommendation: GO, full capability level.** Every capability Tabby needs works with public APIs plus `_AXUIElementGetWindow`. Moving windows to another desktop (H9) works too: 6/6 in the follow-up test of 2026-10-08.
 
 ## How it was tested
 
@@ -26,7 +26,7 @@
 | H6 | Overlay above Mission Control | Pass. A non-activating `NSPanel` at the assistive-technology level (1500) stays above Mission Control's windows (Dock 20, WindowManager ≤ 19), and the user saw it. |
 | H7 | Intercept Tab / Return inside Mission Control | Pass. 9/9 Tab sequences, 9/9 correct selections, 9/9 Return keys, 0 tap timeouts. Accessibility permission is enough (Input Monitoring was also granted). |
 | H8 | `_AXUIElementGetWindow` | Pass. 100 % of the real windows matched; windows that exist only in the Window Server have no AX element and are ignored. |
-| H9 | Move a window to another desktop | Pending. The Spaces bar is exposed: `mc.spaces` → `mc.spaces.list` → one `AXButton` per desktop ("Escritorio 1", "Escritorio 2", with `AXPress` and `AXRemoveDesktop`) plus `mc.spaces.add`, all with frames. Thumbnails expose no "move" action, so the synthetic drag still has to be tested. |
+| H9 | Move a window to another desktop | **Works, 6/6.** Each display has its own `mc.display` group with a Spaces bar (`mc.spaces.list` + `mc.spaces.add`). `AXPress` on `mc.spaces.add` creates a desktop in 14–28 ms without moving the mouse. A synthetic drag from the thumbnail to the top of the display expands the bar; dropping on the desktop moves the window in ~0.5 s and Mission Control stays open. Note: WindowManager reports each desktop's **center** as its frame origin, and the positions only make sense once the bar is expanded. |
 | H10 | Shortcut fallback | Not needed. |
 
 ## Decisions for the app
@@ -44,4 +44,4 @@
 - Re-check the Finder `AXPress` failure (duplicate buttons? slow activation?).
 - Confirm focus is kept after closing Mission Control with Esc (strategy B).
 - Measure the CPU cost of polling while idle.
-- H9: synthetic drag from a thumbnail to a desktop button (Phase 2).
+- Fullscreen apps also appear in the Spaces bar: check how they affect desktop numbering.

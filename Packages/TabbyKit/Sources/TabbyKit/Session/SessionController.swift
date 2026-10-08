@@ -6,6 +6,7 @@ public final class SessionController {
         case opened(windows: Int)
         case selected(MissionWindow)
         case activated(MissionWindow, ActivationResult)
+        case moved(MissionWindow, desktop: Int, SpaceMoveResult)
         case closed
     }
 
@@ -96,6 +97,8 @@ public final class SessionController {
             }
         case .activate:
             activate(session)
+        case .moveToDesktop(let number):
+            move(session, toDesktop: number)
         }
     }
 
@@ -162,6 +165,44 @@ public final class SessionController {
         Task { [weak self] in
             let result = await activator.activate(window, thumbnail: thumbnail)
             self?.onEvent?(.activated(window, result))
+        }
+    }
+
+    private func move(_ session: NavigationSession, toDesktop number: Int) {
+        guard let window = session.selected else { return }
+        state = .movingWindow(session, target: window.id, desktop: number)
+        dependencies.presenter.dismiss()
+        presented = nil
+        let mover = dependencies.mover
+        Task { [weak self] in
+            let result = await mover.move(window, toDesktop: number)
+            self?.finishMove(window, toDesktop: number, result: result)
+        }
+    }
+
+    private func finishMove(_ window: MissionWindow, toDesktop number: Int, result: SpaceMoveResult) {
+        guard case .movingWindow(var session, let target, _) = state, target == window.id else { return }
+        if result.moved {
+            session.remove(window.id)
+        }
+        state = .navigating(session)
+        tracker.reclaim(pointer: dependencies.pointer.location)
+        dependencies.presenter.prepare(for: Array(session.windows.values))
+        render()
+        if case .failed(let failure, _) = result {
+            dependencies.presenter.showNotice(Self.notice(for: failure, desktop: number))
+        }
+        onEvent?(.moved(window, desktop: number, result))
+    }
+
+    private static func notice(for failure: SpaceMoveFailure, desktop number: Int) -> String {
+        switch failure {
+        case .invalidDesktop:
+            localized("macOS allows up to \(SpaceMover.maximumDesktops) desktops", "macOS permite hasta \(SpaceMover.maximumDesktops) escritorios")
+        case .desktopNotCreated:
+            localized("Couldn't create Desktop \(number)", "No se pudo crear el Escritorio \(number)")
+        case .noThumbnail, .noSpacesBar, .dropRejected:
+            localized("Couldn't move the window to Desktop \(number)", "No se pudo mover la ventana al Escritorio \(number)")
         }
     }
 

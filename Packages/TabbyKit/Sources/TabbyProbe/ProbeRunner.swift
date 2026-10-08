@@ -673,6 +673,8 @@ final class ProbeRunner {
             render()
         case .activate:
             activateSelection()
+        case .moveToDesktop:
+            break
         }
     }
 

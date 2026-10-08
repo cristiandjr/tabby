@@ -9,6 +9,7 @@ struct SessionControllerTests {
     let windows = FakeWindows()
     let thumbnails = FakeThumbnails()
     let activator = FakeActivator()
+    let mover = FakeMover()
     let presenter = FakePresenter()
     let keyboard = FakeKeyboard()
     let pointer = FakePointer()
@@ -21,6 +22,7 @@ struct SessionControllerTests {
             windows: windows,
             thumbnails: thumbnails,
             activator: activator,
+            mover: mover,
             presenter: presenter,
             keyboard: keyboard,
             pointer: pointer,
@@ -212,5 +214,73 @@ struct SessionControllerTests {
         controller.refresh()
         #expect(controller.matchedThumbnails == 3)
         #expect(controller.selectedHasThumbnail)
+    }
+
+    @Test func commandNumberMovesTheSelectedWindowAndSelectsTheNextOne() async {
+        var moved: (CGWindowID, Int)?
+        controller.onEvent = { event in
+            if case .moved(let window, let desktop, _) = event { moved = (window.id, desktop) }
+        }
+        open()
+        controller.perform(.moveToDesktop(3))
+        if case .movingWindow(_, let target, let desktop) = controller.state {
+            #expect(target == 2)
+            #expect(desktop == 3)
+        } else {
+            Issue.record("expected the moving state")
+        }
+        await Task.yield()
+        await Task.yield()
+        #expect(mover.calls.map(\.desktop) == [3])
+        #expect(controller.state.isNavigating)
+        #expect(controller.state.session?.engine.windowIDs == [1, 3])
+        #expect(controller.state.session?.selected?.id == 3)
+        #expect(moved?.0 == 2)
+        #expect(keyboard.mode == .intercept)
+        #expect(presenter.prepared.count == 2)
+    }
+
+    @Test func ignoresKeysWhileMovingAWindow() async {
+        open()
+        controller.perform(.moveToDesktop(2))
+        controller.perform(.next)
+        controller.perform(.moveToDesktop(4))
+        await Task.yield()
+        await Task.yield()
+        #expect(mover.calls.map(\.desktop) == [2])
+        #expect(controller.state.session?.selected?.id == 3)
+    }
+
+    @Test func aFailedMoveKeepsTheWindowAndShowsANotice() async {
+        mover.result = .failed(.dropRejected, createdDesktops: 0)
+        open()
+        controller.perform(.moveToDesktop(5))
+        await Task.yield()
+        await Task.yield()
+        #expect(controller.state.session?.engine.windowIDs == [1, 2, 3])
+        #expect(controller.state.session?.selected?.id == 2)
+        #expect(presenter.notices.count == 1)
+    }
+
+    @Test func closingMissionControlDuringAMoveEndsTheSession() async {
+        open()
+        controller.perform(.moveToDesktop(2))
+        close()
+        await Task.yield()
+        await Task.yield()
+        #expect(!controller.isSessionActive)
+    }
+
+    @Test func movingTheLastWindowLeavesAnEmptySession() async {
+        windows.windows = [makeWindow(1)]
+        open()
+        controller.perform(.moveToDesktop(2))
+        await Task.yield()
+        await Task.yield()
+        #expect(controller.state.isNavigating)
+        #expect(controller.state.session?.selected == nil)
+        controller.perform(.next)
+        controller.perform(.activate)
+        #expect(activator.calls.isEmpty)
     }
 }

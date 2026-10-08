@@ -62,6 +62,8 @@ final class DemoRunner {
         case .activated(let window, let result):
             lastActivation = (window, result.exact, result.strategy)
             say("  \(result.exact ? "✅" : "⚠️") \(describe(window)) · \(Int(result.elapsed / .milliseconds(1))) ms" + (result.exact ? "" : t(" (focus did not match)", " (el foco no coincidió)")))
+        case .moved(let window, let desktop, let result):
+            say("  \(result.moved ? "↗︎" : "⚠️") \(describe(window)) → \(t("Desktop", "Escritorio")) \(desktop) · \(String(describing: result))")
         case .closed:
             say("○ " + t("closed", "cerrado"))
         }

@@ -1,4 +1,5 @@
 import SwiftUI
+import TabbyKit
 
 struct MenuContent: View {
     @Bindable var model: AppModel

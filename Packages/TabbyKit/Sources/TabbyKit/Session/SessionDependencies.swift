@@ -38,6 +38,7 @@ public struct SessionDependencies {
     public var windows: any WindowProviding
     public var thumbnails: any ThumbnailProviding
     public var activator: any WindowActivating
+    public var mover: any SpaceMoving
     public var presenter: any SelectionPresenting
     public var keyboard: any KeyboardIntercepting
     public var pointer: any PointerMonitoring
@@ -49,6 +50,7 @@ public struct SessionDependencies {
         windows: any WindowProviding,
         thumbnails: any ThumbnailProviding,
         activator: any WindowActivating,
+        mover: any SpaceMoving,
         presenter: any SelectionPresenting,
         keyboard: any KeyboardIntercepting,
         pointer: any PointerMonitoring,
@@ -59,6 +61,7 @@ public struct SessionDependencies {
         self.windows = windows
         self.thumbnails = thumbnails
         self.activator = activator
+        self.mover = mover
         self.presenter = presenter
         self.keyboard = keyboard
         self.pointer = pointer

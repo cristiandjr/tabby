@@ -49,6 +49,7 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 | ⌨️ **Keyboard first** | Tab, ⇧Tab and Return inside Mission Control, most recent window first. |
 | 🎯 **The exact window** | Focuses the window you picked, even when several windows belong to the same app. |
 | ✨ **See where you are** | The selected window lifts slightly with a soft spring and settles back when you move on. |
+| 🗂️ **Send it to a desktop** | <kbd>⌘</kbd><kbd>1</kbd>…<kbd>⌘</kbd><kbd>9</kbd> moves the selected window to that desktop, creating it if it doesn't exist yet. |
 | 🪄 **However you open it** | Shortcut, F3, trackpad gesture or hot corner: Tabby doesn't depend on any of them. |
 | 🍎 **Native** | Swift, SwiftUI and AppKit. A tiny menu bar app that stays out of your way. |
 | 🔒 **Private** | No network, no analytics, no accounts. It only listens to the keyboard while Mission Control is open. |
@@ -59,7 +60,7 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 - [x] **Spike 0:** validate the macOS capabilities Tabby relies on
 - [ ] **v0.1:** menu bar app with Tab, ⇧Tab and Return *(in progress)*
 - [ ] Arrow-key navigation based on the thumbnails' positions
-- [ ] Move the selected window to another desktop with a shortcut
+- [x] Move the selected window to another desktop with a shortcut
 - [ ] Number shortcuts (1–9) and window search
 
 ### Download
@@ -135,6 +136,7 @@ Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima
 | ⌨️ **Primero el teclado** | Tab, ⇧Tab y Enter dentro de Mission Control, empezando por la ventana más reciente. |
 | 🎯 **La ventana exacta** | Enfoca la ventana que elegiste, aunque haya varias de la misma app. |
 | ✨ **Sabes dónde estás** | La ventana seleccionada se levanta un poco con un resorte suave y vuelve a su lugar al pasar a otra. |
+| 🗂️ **Mándala a un escritorio** | <kbd>⌘</kbd><kbd>1</kbd>…<kbd>⌘</kbd><kbd>9</kbd> mueve la ventana seleccionada a ese escritorio y, si todavía no existe, lo crea. |
 | 🪄 **Como sea que lo abras** | Atajo, F3, gesto o esquina activa: Tabby no depende de ninguno. |
 | 🍎 **Nativa** | Swift, SwiftUI y AppKit. Una app mínima en la barra de menús que no estorba. |
 | 🔒 **Privada** | Sin red, sin analíticas y sin cuentas. Solo escucha el teclado mientras Mission Control está abierto. |
@@ -145,7 +147,7 @@ Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima
 - [x] **Spike 0:** validar las capacidades de macOS que necesita Tabby
 - [ ] **v0.1:** app de barra de menús con Tab, ⇧Tab y Enter *(en curso)*
 - [ ] Navegación con flechas según la posición de las miniaturas
-- [ ] Mover la ventana seleccionada a otro escritorio con un atajo
+- [x] Mover la ventana seleccionada a otro escritorio con un atajo
 - [ ] Atajos numéricos (1–9) y búsqueda de ventanas
 
 ### Descarga

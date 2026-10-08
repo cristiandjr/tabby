@@ -2,7 +2,7 @@ import CoreGraphics
 
 public struct NavigationSession {
     public private(set) var engine: NavigationEngine
-    public let windows: [CGWindowID: MissionWindow]
+    public private(set) var windows: [CGWindowID: MissionWindow]
     public internal(set) var thumbnails: [CGWindowID: MissionControlThumbnail] = [:]
 
     init(windows: [MissionWindow]) {
@@ -20,9 +20,15 @@ public struct NavigationSession {
             engine.next()
         case .previous:
             engine.previous()
-        case .activate:
+        case .activate, .moveToDesktop:
             break
         }
+    }
+
+    mutating func remove(_ id: CGWindowID) {
+        engine.update(windowIDs: engine.windowIDs.filter { $0 != id })
+        windows[id] = nil
+        thumbnails[id] = nil
     }
 }
 
@@ -30,12 +36,13 @@ public enum SessionState {
     case idle
     case navigating(NavigationSession)
     case activating(NavigationSession, target: CGWindowID)
+    case movingWindow(NavigationSession, target: CGWindowID, desktop: Int)
 
     public var session: NavigationSession? {
         switch self {
         case .idle:
             nil
-        case .navigating(let session), .activating(let session, _):
+        case .navigating(let session), .activating(let session, _), .movingWindow(let session, _, _):
             session
         }
     }

@@ -135,6 +135,8 @@ final class AppModel {
             log.info("mission control opened with \(windows) windows")
         case .activated(_, let result):
             log.info("activated exact=\(result.exact) strategy=\(result.strategy.rawValue, privacy: .public) in \(Int(result.elapsed / .milliseconds(1)))ms")
+        case .moved(_, let desktop, let result):
+            log.info("moved to desktop \(desktop) result=\(String(describing: result), privacy: .public)")
         case .selected, .closed:
             break
         }

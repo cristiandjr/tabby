@@ -96,6 +96,7 @@ final class FakeActivator: WindowActivating {
 final class FakePresenter: SelectionPresenting {
     var prepared: [[CGWindowID]] = []
     var presentations: [SelectionPresentation] = []
+    var notices: [String] = []
     var dismissals = 0
 
     var last: SelectionPresentation? {
@@ -110,8 +111,76 @@ final class FakePresenter: SelectionPresenting {
         presentations.append(presentation)
     }
 
+    func showNotice(_ text: String) {
+        notices.append(text)
+    }
+
     func dismiss() {
         dismissals += 1
+    }
+}
+
+@MainActor
+final class FakeMover: SpaceMoving {
+    var calls: [(window: CGWindowID, desktop: Int)] = []
+    var result = SpaceMoveResult.moved(createdDesktops: 0)
+
+    func move(_ window: MissionWindow, toDesktop number: Int) async -> SpaceMoveResult {
+        calls.append((window.id, number))
+        return result
+    }
+}
+
+@MainActor
+final class FakeSpaceSystem: SpaceSystem {
+    var pointerLocation = CGPoint(x: 500, y: 500)
+    var thumbnail: CGRect? = CGRect(x: 100, y: 400, width: 300, height: 200)
+    var hasBar = true
+    var desktopCount = 2
+    var addCreatesDesktop = true
+    var expandsAfterDrags = 3
+    var acceptsDrop = true
+    private(set) var events: [PointerEvent] = []
+    private(set) var additions = 0
+    private var drags = 0
+    private var dropped = false
+    let display = CGRect(x: 0, y: 0, width: 1920, height: 1080)
+
+    func thumbnailFrame(of window: MissionWindow) -> CGRect? {
+        thumbnail
+    }
+
+    func spacesBar(containing point: CGPoint) -> SpacesBar? {
+        guard hasBar else { return nil }
+        let y: CGFloat = drags >= expandsAfterDrags ? 102 : -33
+        return SpacesBar(displayFrame: display, desktopCenters: (0..<desktopCount).map { CGPoint(x: 768 + CGFloat($0) * 192, y: y) })
+    }
+
+    func addDesktop(containing point: CGPoint) {
+        additions += 1
+        if addCreatesDesktop { desktopCount += 1 }
+    }
+
+    func isOnCurrentDesktop(_ window: MissionWindow) -> Bool {
+        !dropped
+    }
+
+    func post(_ event: PointerEvent) {
+        events.append(event)
+        switch event {
+        case .drag:
+            drags += 1
+        case .up(let point):
+            dropped = acceptsDrop && point.y > display.minY + 60
+        default:
+            break
+        }
+    }
+
+    var downs: Int { events.filter { if case .down = $0 { return true }; return false }.count }
+    var ups: Int { events.filter { if case .up = $0 { return true }; return false }.count }
+    var lastWarp: CGPoint? {
+        events.compactMap { if case .warp(let point) = $0 { return point }; return nil }.last
     }
 }
 

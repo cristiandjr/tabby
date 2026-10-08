@@ -373,6 +373,8 @@ final class AutoRunner {
         case .activate:
             returnReceived = true
             activate()
+        case .moveToDesktop:
+            break
         }
     }
 

@@ -36,6 +36,7 @@ public enum KeyCode {
     public static let returnKey: UInt16 = 36
     public static let keypadEnter: UInt16 = 76
     public static let escape: UInt16 = 53
+    public static let digits: [UInt16] = [18, 19, 20, 21, 23, 22, 26, 28, 25]
 }
 
 public struct KeyCombo: Codable, Hashable, Sendable {

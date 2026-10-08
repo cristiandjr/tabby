@@ -62,6 +62,10 @@ public final class OverlayPresenter: SelectionPresenting {
         }
     }
 
+    public func showNotice(_ text: String) {
+        overlay.showHUD(text: text, near: current?.thumbnailFrame ?? current?.fallbackFrame)
+    }
+
     public func dismiss() {
         current = nil
         overlay.hide()

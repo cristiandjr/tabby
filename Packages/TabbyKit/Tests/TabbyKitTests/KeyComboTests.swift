@@ -42,10 +42,20 @@ struct KeyComboTests {
         #expect(keymap.action(forKeyCode: KeyCode.tab, flags: .maskCommand) == nil)
     }
 
+    @Test func commandDigitsMoveToTheirDesktop() {
+        let keymap = Keymap.standard
+        #expect(keymap.action(forKeyCode: 18, flags: .maskCommand) == .moveToDesktop(1))
+        #expect(keymap.action(forKeyCode: 23, flags: .maskCommand) == .moveToDesktop(5))
+        #expect(keymap.action(forKeyCode: 25, flags: .maskCommand) == .moveToDesktop(9))
+        #expect(keymap.action(forKeyCode: 18, flags: []) == nil)
+        #expect(Keymap.moveToDesktop(modifiers: [.option, .shift])[KeyCombo(keyCode: 20, modifiers: [.option, .shift])] == .moveToDesktop(3))
+    }
+
     @Test func onlyNavigationRepeatsWhenHeld() {
         #expect(SessionAction.next.repeatsWhenHeld)
         #expect(SessionAction.previous.repeatsWhenHeld)
         #expect(!SessionAction.activate.repeatsWhenHeld)
+        #expect(!SessionAction.moveToDesktop(2).repeatsWhenHeld)
     }
 
     @Test func keymapRoundTripsThroughJSON() throws {
