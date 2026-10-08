@@ -4,6 +4,17 @@ All notable changes to Tabby are documented here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2] - 2026-10-08
+
+### Added
+
+- When a new version is out, the menu shows **New Version … Available** and opens its release page. Tabby checks GitHub when it starts and every 12 hours, and you can turn it off in Settings.
+- About and Diagnostics show the full version, for example 0.1.0-alpha.2.
+
+### Fixed
+
+- The 0.1.0-alpha.1 download was signed ad hoc instead of with the project certificate, so macOS didn't recognize the permissions you had already granted. Releases are signed with the project certificate again, and a release can't be published without it.
+
 ## [0.1.0-alpha.1] - 2026-10-08
 
 First preview build.

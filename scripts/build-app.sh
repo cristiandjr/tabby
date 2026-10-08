@@ -19,7 +19,7 @@ BINARY="$(swift build --package-path "$PACKAGE" -c release --product Tabby ${UNI
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINARY" "$APP/Contents/MacOS/Tabby"
-sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" App/Info.plist > "$APP/Contents/Info.plist"
+sed -e "s/__VERSION__/${VERSION%%-*}/" -e "s/__FULL_VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" App/Info.plist > "$APP/Contents/Info.plist"
 cp App/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp docs/assets/logo-dark.png "$APP/Contents/Resources/Logo-dark.png"
 cp docs/assets/logo-light.png "$APP/Contents/Resources/Logo-light.png"

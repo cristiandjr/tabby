@@ -26,13 +26,24 @@ final class AppModel {
     private(set) var missionControlDetections = 0
     var settingsTab = SettingsTab.general
 
+    var checksForUpdates = UserDefaults.standard.object(forKey: AppModel.checksForUpdatesKey) as? Bool ?? true {
+        didSet { applyChecksForUpdates() }
+    }
+
+    private(set) var availableUpdate: ReleaseInfo?
+
     let isTranslocated = Bundle.main.bundlePath.contains("/AppTranslocation/")
 
-    @ObservationIgnored let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+    @ObservationIgnored let version = Bundle.main.object(forInfoDictionaryKey: "TabbyVersion") as? String
+        ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        ?? "dev"
 
     @ObservationIgnored private static let liftsSelectionKey = "liftsSelection"
     @ObservationIgnored private static let shortcutsKey = "shortcuts"
     @ObservationIgnored private static let onboardingKey = "onboardingCompleted"
+    @ObservationIgnored private static let checksForUpdatesKey = "checksForUpdates"
+    @ObservationIgnored private static let updateInterval: Duration = .seconds(12 * 60 * 60)
+    @ObservationIgnored private var updateTask: Task<Void, Never>?
     @ObservationIgnored private let onboarding = HostedWindow()
     @ObservationIgnored private let diagnostics = HostedWindow()
     @ObservationIgnored private var lastSession: DiagnosticsReport.Session?
@@ -56,6 +67,7 @@ final class AppModel {
                 self?.hideFromDockIfNoWindows(closing: closing)
             }
         }
+        applyChecksForUpdates()
         let needsOnboarding = !UserDefaults.standard.bool(forKey: Self.onboardingKey)
         if hasAccessibility {
             startIfNeeded()
@@ -86,6 +98,34 @@ final class AppModel {
         showInDock()
         diagnostics.show(title: "Tabby Diagnostics") {
             DiagnosticsView(model: self)
+        }
+    }
+
+    func openUpdate() {
+        if let availableUpdate {
+            NSWorkspace.shared.open(availableUpdate.url)
+        }
+    }
+
+    private func applyChecksForUpdates() {
+        UserDefaults.standard.set(checksForUpdates, forKey: Self.checksForUpdatesKey)
+        updateTask?.cancel()
+        guard checksForUpdates else {
+            availableUpdate = nil
+            return
+        }
+        let version = version
+        updateTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            while !Task.isCancelled {
+                let release = await UpdateChecker.newerRelease(than: version)
+                guard let self, !Task.isCancelled else { return }
+                if let release {
+                    self.availableUpdate = release
+                    self.log.info("new version available: \(release.version, privacy: .public)")
+                }
+                try? await Task.sleep(for: Self.updateInterval)
+            }
         }
     }
 
@@ -127,6 +167,8 @@ final class AppModel {
             reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
             translocated: isTranslocated,
             launchAtLogin: Self.launchAtLoginStatus,
+            updateCheck: checksForUpdates,
+            availableUpdate: availableUpdate?.version,
             lastSession: lastSession
         )
     }

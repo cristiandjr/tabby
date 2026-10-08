@@ -43,6 +43,12 @@ private struct GeneralSettings: View {
                 }
             }
             Section {
+                Toggle("Check for new versions", isOn: $model.checksForUpdates)
+            } footer: {
+                Text("Tabby asks GitHub for its latest release when it starts and every 12 hours, and shows New Version Available in the menu. Nothing about you is sent.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 Button("Show the welcome tour") {
                     model.showOnboarding()
                 }
@@ -67,6 +73,7 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+        .frame(minHeight: 640)
     }
 }
 

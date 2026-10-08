@@ -45,6 +45,8 @@ public struct DiagnosticsReport: Equatable, Sendable {
     public var reduceMotion: Bool
     public var translocated: Bool
     public var launchAtLogin: String
+    public var updateCheck: Bool
+    public var availableUpdate: String?
     public var lastSession: Session?
 
     public init(
@@ -52,7 +54,7 @@ public struct DiagnosticsReport: Equatable, Sendable {
         accessibility: Bool, screenRecording: Bool, postEvents: Bool, listenEvents: Bool, secureInput: Bool,
         privateWindowAPI: Bool, enabled: Bool, running: Bool, keyboardTap: Bool, tapTimeouts: Int,
         shortcuts: [String], liftSetting: Bool, reduceMotion: Bool, translocated: Bool, launchAtLogin: String,
-        lastSession: Session?
+        updateCheck: Bool = true, availableUpdate: String? = nil, lastSession: Session?
     ) {
         self.appVersion = appVersion
         self.build = build
@@ -74,6 +76,8 @@ public struct DiagnosticsReport: Equatable, Sendable {
         self.reduceMotion = reduceMotion
         self.translocated = translocated
         self.launchAtLogin = launchAtLogin
+        self.updateCheck = updateCheck
+        self.availableUpdate = availableUpdate
         self.lastSession = lastSession
     }
 
@@ -95,6 +99,7 @@ public struct DiagnosticsReport: Equatable, Sendable {
             "Shortcuts: " + shortcuts.joined(separator: " · "),
             "Lift effect: \(liftSetting ? "on" : "off") · active: \(Self.yes(liftSetting && screenRecording && !reduceMotion)) · reduce motion: \(Self.yes(reduceMotion))",
             "Translocated: \(Self.yes(translocated)) · Launch at login: \(launchAtLogin)",
+            "Update check: \(updateCheck ? "on" : "off") · new version: \(availableUpdate ?? "none")",
             "Capability level: " + (capabilityLevel.map { "\($0) (\(Self.levelName($0)))" } ?? "unknown, open Mission Control once"),
         ]
         if let lastSession {

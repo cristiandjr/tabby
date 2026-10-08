@@ -6,6 +6,12 @@ struct MenuContent: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
+        if let update = model.availableUpdate {
+            Button("New Version \(update.version) Available…") {
+                model.openUpdate()
+            }
+            Divider()
+        }
         Text(model.status)
         if !model.hasAccessibility {
             Button("Grant Accessibility Permission…") {

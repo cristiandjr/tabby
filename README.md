@@ -12,7 +12,15 @@
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-111111?logo=apple&logoColor=white">
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white">
   <img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2EA44F">
-  <img alt="Status: early development" src="https://img.shields.io/badge/status-early%20development-F59E0B">
+  <img alt="Status: alpha" src="https://img.shields.io/badge/status-alpha-F59E0B">
+</p>
+
+<p align="center">
+  <a href="../../releases/latest/download/Tabby.zip"><img alt="Download for macOS" src="https://img.shields.io/badge/macOS-Download%20Tabby-0A5CFF?style=for-the-badge&logo=apple&logoColor=white"></a>
+  <br>
+  <sub>No installer: download the zip, open Tabby.app, done. Universal (Apple Silicon + Intel) · macOS 14+ · <a href="../../releases">all releases</a></sub>
+  <br>
+  <sub>Sin instalador: descarga el zip, abre Tabby.app y listo. Universal (Apple Silicon + Intel) · macOS 14+ · <a href="../../releases">todas las versiones</a></sub>
 </p>
 
 <p align="center">
@@ -26,7 +34,7 @@
 ## English
 
 > [!NOTE]
-> Tabby is in early development and not ready for daily use yet.
+> Tabby is in alpha: it works every day on the author's Mac, but expect rough edges. Bug reports are very welcome.
 
 ### What is Tabby?
 
@@ -53,7 +61,7 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 | ⚙️ **Your shortcuts** | Change every shortcut in Settings. |
 | 🪄 **However you open it** | Shortcut, F3, trackpad gesture or hot corner: Tabby doesn't depend on any of them. |
 | 🍎 **Native** | Swift, SwiftUI and AppKit. A tiny menu bar app that stays out of your way. |
-| 🔒 **Private** | No network, no analytics, no accounts. It only listens to the keyboard while Mission Control is open. |
+| 🔒 **Private** | No analytics, no accounts. It only listens to the keyboard while Mission Control is open, and its only network request is the optional check for new versions. |
 | 💸 **Free and open source** | MIT licensed. |
 
 ### Roadmap
@@ -67,9 +75,9 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 
 ### Download
 
-Tabby is a single download, with no installer. The first preview is **v0.1.0-alpha.1**:
+Tabby is a single download, with no installer. Use the **Download** button at the top, or:
 
-1. Download **Tabby.zip** from the [latest release](https://github.com/cristiandjr/tabby/releases) and open it.
+1. Download [**Tabby.zip**](../../releases/latest/download/Tabby.zip) from the latest release and open it.
 2. Open **Tabby.app**. Tabby isn't notarized yet, so macOS blocks it the first time: go to **System Settings → Privacy & Security** and click **Open Anyway**.
 3. A short welcome tour guides you through the **Accessibility** permission and a first try.
 4. Optional: move Tabby to **Applications**. You only need this for *Launch at Login*.
@@ -80,7 +88,7 @@ macOS requires Accessibility permission for apps that detect Mission Control, re
 
 - It only listens to the keyboard while Mission Control is open.
 - It never records or sends what you type.
-- It has no network access, no analytics and no accounts.
+- It has no analytics and no accounts. Its only network request is a check for new versions: when it starts and every 12 hours it reads the latest release from GitHub. Nothing about you is sent, and you can turn it off in Settings.
 - **Screen Recording is optional** and only powers the lift effect. Tabby captures the windows of the current display while Mission Control is open, keeps the images in memory and drops them when it closes. Nothing is saved or sent. Without it, Tabby works the same with a plain highlight.
 - The code is open, so you can check all of the above.
 
@@ -122,7 +130,7 @@ The code is released under the [MIT License](LICENSE). The Tabby name, logo and 
 ## Español
 
 > [!NOTE]
-> Tabby está en desarrollo temprano y todavía no está listo para el uso diario.
+> Tabby está en alfa: funciona todos los días en la Mac de su autor, pero puede tener detalles. Los reportes de errores son muy bienvenidos.
 
 ### ¿Qué es Tabby?
 
@@ -149,7 +157,7 @@ Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima
 | ⚙️ **Tus atajos** | Cambia cualquier atajo en **Settings**. |
 | 🪄 **Como sea que lo abras** | Atajo, F3, gesto o esquina activa: Tabby no depende de ninguno. |
 | 🍎 **Nativa** | Swift, SwiftUI y AppKit. Una app mínima en la barra de menús que no estorba. |
-| 🔒 **Privada** | Sin red, sin analíticas y sin cuentas. Solo escucha el teclado mientras Mission Control está abierto. |
+| 🔒 **Privada** | Sin analíticas y sin cuentas. Solo escucha el teclado mientras Mission Control está abierto, y lo único que consulta por red es si hay una versión nueva (opcional). |
 | 💸 **Gratis y de código abierto** | Licencia MIT. |
 
 ### Hoja de ruta
@@ -163,9 +171,9 @@ Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima
 
 ### Descarga
 
-Tabby es una sola descarga, sin instalador. La primera versión de prueba es la **v0.1.0-alpha.1**:
+Tabby es una sola descarga, sin instalador. Usa el botón **Download** de arriba, o:
 
-1. Descarga **Tabby.zip** desde la [última versión](https://github.com/cristiandjr/tabby/releases) y ábrelo.
+1. Descarga [**Tabby.zip**](../../releases/latest/download/Tabby.zip) de la última versión y ábrelo.
 2. Abre **Tabby.app**. Como todavía no está notarizada, macOS la bloquea la primera vez: ve a **Configuración del Sistema → Privacidad y seguridad** y haz clic en **Abrir igualmente**.
 3. Una bienvenida corta te guía con el permiso de **Accesibilidad** y una primera prueba.
 4. Opcional: mueve Tabby a **Aplicaciones**. Solo hace falta para *Abrir al iniciar sesión*.
@@ -176,7 +184,7 @@ macOS exige el permiso de Accesibilidad a las apps que detectan Mission Control,
 
 - Solo escucha el teclado mientras Mission Control está abierto.
 - Nunca guarda ni envía lo que escribes.
-- No tiene acceso a la red, ni analíticas, ni cuentas.
+- No tiene analíticas ni cuentas. Lo único que hace por red es buscar versiones nuevas: al abrirse y cada 12 horas lee la última versión publicada en GitHub. No se envía nada sobre ti, y se puede desactivar en Settings.
 - **Grabación de pantalla es opcional** y solo se usa para el efecto de agrandar. Tabby captura las ventanas de la pantalla actual mientras Mission Control está abierto, guarda las imágenes en memoria y las descarta al cerrarlo. No se guarda ni se envía nada. Sin ese permiso, Tabby funciona igual con un recuadro simple.
 - El código es abierto: puedes comprobar todo lo anterior.
 

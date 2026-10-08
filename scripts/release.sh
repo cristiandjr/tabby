@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION="${1:?usage: scripts/release.sh <version, for example 0.1.0-alpha.1>}"
-scripts/build-app.sh "${VERSION%%-*}"
+scripts/build-app.sh "$VERSION"
 
 rm -rf dist
 mkdir -p dist
