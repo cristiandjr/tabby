@@ -4,6 +4,7 @@ import TabbyKit
 
 enum ProbeCommand: String {
     case run
+    case auto
     case check
     case dump
 }
@@ -61,7 +62,7 @@ final class ProbeRunner {
 
     private var engine: NavigationEngine?
     private var sessionWindows: [CGWindowID: MissionWindow] = [:]
-    private var thumbnails: [CGWindowID: DockCandidate] = [:]
+    private var thumbnails: [CGWindowID: MissionControlThumbnail] = [:]
     private var sessionKeys: [String: Int] = [:]
     private var pending: PendingActivation?
     private var attemptCounter = 0
@@ -80,6 +81,8 @@ final class ProbeRunner {
             return await dumpOnly()
         case .run:
             return await guided()
+        case .auto:
+            return await AutoRunner(outputDirectory: outputDirectory).run()
         }
     }
 
@@ -365,7 +368,12 @@ final class ProbeRunner {
         for sample in samples {
             report.hitTestOwners[sample.owner ?? sample.status, default: 0] += 1
         }
-        let dockElements = samples.filter { $0.owner == "Dock" && $0.identifier != DockAccessibility.missionControlIdentifier && $0.role != "AXApplication" }
+        let containerIdentifiers = [DockAccessibility.missionControlIdentifier, MissionControlAccessibility.displayIdentifier]
+        let dockElements = samples.filter { sample in
+            (sample.owner == "Dock" || sample.owner == "WindowManager")
+                && !containerIdentifiers.contains(sample.identifier ?? "")
+                && sample.role != "AXApplication"
+        }
         report.hitTestDockElements = Array(Set(dockElements.map { "\($0.role ?? "?") id=\($0.identifier ?? "-") title=\($0.title ?? "-") desc=\($0.label ?? "-")" })).sorted()
         lines.append("")
         lines.append("## Hit test (\(samples.count) points)")
@@ -615,11 +623,10 @@ final class ProbeRunner {
 
     private func resolveThumbnails() {
         let started = ContinuousClock().now
-        let candidates = DockAccessibility.pressableCandidates()
-        for window in sessionWindows.values where thumbnails[window.id] == nil {
-            if let match = DockAccessibility.bestThumbnail(for: window, in: candidates) {
-                thumbnails[window.id] = match
-            }
+        let found = MissionControlAccessibility.thumbnails()
+        let windows = Array(sessionWindows.values)
+        for (id, index) in MissionControlAccessibility.match(windows: windows, thumbnails: found.map(\.info)) {
+            thumbnails[id] = found[index]
         }
         if let last = report.sessions.indices.last {
             report.sessions[last].thumbnailsFound = thumbnails.count
@@ -634,7 +641,7 @@ final class ProbeRunner {
         }
         let position = (engine.selectedIndex ?? 0) + 1
         let title = window.title.map { " — \($0)" } ?? ""
-        let thumbnailFrame = thumbnails[id]?.frame
+        let thumbnailFrame = thumbnails[id]?.info.frame
         overlay.showHighlight(globalRect: thumbnailFrame)
         overlay.showHUD(text: "\(window.appName)\(title)  ·  \(position)/\(engine.windowIDs.count)", near: thumbnailFrame ?? window.frame)
     }

@@ -67,6 +67,10 @@ final class SelectionOverlay {
         hudPanel.orderFrontRegardless()
     }
 
+    var visibleWindowNumbers: [Int] {
+        ([hudPanel] + highlightPanels).filter(\.isVisible).map(\.windowNumber)
+    }
+
     func hide() {
         highlightPanels.forEach { $0.orderOut(nil) }
         hudPanel.orderOut(nil)

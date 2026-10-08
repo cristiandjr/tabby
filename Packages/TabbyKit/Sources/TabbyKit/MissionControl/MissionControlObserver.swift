@@ -20,9 +20,9 @@ public final class MissionControlObserver {
     public init() {}
 
     @discardableResult
-    public func start() -> [MissionControlEvent: AXError]? {
+    public func start(pid explicitPID: pid_t? = nil) -> [MissionControlEvent: AXError]? {
         stop()
-        guard let pid = DockAccessibility.pid else { return nil }
+        guard let pid = explicitPID ?? DockAccessibility.pid else { return nil }
         var created: AXObserver?
         let status = AXObserverCreate(pid, { _, _, notification, refcon in
             guard let refcon else { return }

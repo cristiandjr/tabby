@@ -13,14 +13,6 @@ public struct AXNode: Codable, Sendable {
     public var children: [AXNode]
 }
 
-public struct DockCandidate {
-    public let element: AXUIElement
-    public let role: String?
-    public let title: String?
-    public let label: String?
-    public let frame: CGRect
-}
-
 public struct HitTestSample: Codable, Sendable {
     public var point: CGPoint
     public var status: String
@@ -113,48 +105,6 @@ public enum DockAccessibility {
             let role = AX.string(child, kAXRoleAttribute) ?? "?"
             let identifier = AX.string(child, identifierAttribute).map { ":\($0)" } ?? ""
             return role + identifier
-        }
-    }
-
-    @MainActor
-    public static func pressableCandidates(maxDepth: Int = 16, maxNodes: Int = 4000) -> [DockCandidate] {
-        guard let pid else { return [] }
-        var candidates: [DockCandidate] = []
-        var budget = maxNodes
-        var stack: [(element: AXUIElement, depth: Int)] = [(AX.application(pid), 0)]
-        while budget > 0, let item = stack.popLast() {
-            budget -= 1
-            let role = AX.string(item.element, kAXRoleAttribute)
-            if role == dockItemRole { continue }
-            if AX.actions(item.element).contains(kAXPressAction), let frame = AX.frame(item.element) {
-                candidates.append(DockCandidate(
-                    element: item.element,
-                    role: role,
-                    title: AX.string(item.element, kAXTitleAttribute),
-                    label: AX.string(item.element, kAXDescriptionAttribute),
-                    frame: frame
-                ))
-            }
-            if item.depth < maxDepth {
-                for child in AX.elements(item.element, kAXChildrenAttribute) {
-                    stack.append((child, item.depth + 1))
-                }
-            }
-        }
-        return candidates
-    }
-
-    public static func bestThumbnail(for window: MissionWindow, in candidates: [DockCandidate]) -> DockCandidate? {
-        guard let title = window.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else { return nil }
-        let matches = candidates.filter { candidate in
-            [candidate.title, candidate.label].contains { text in
-                guard let text, !text.isEmpty else { return false }
-                return text == title || text.contains(title)
-            }
-        }
-        let aspect = window.frame.width / max(window.frame.height, 1)
-        return matches.min { first, second in
-            abs(first.frame.width / max(first.frame.height, 1) - aspect) < abs(second.frame.width / max(second.frame.height, 1) - aspect)
         }
     }
 

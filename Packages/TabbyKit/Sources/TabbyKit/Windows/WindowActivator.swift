@@ -38,9 +38,12 @@ public enum WindowActivator {
         return (app.processIdentifier, window.flatMap(PrivateAXBridge.windowID(of:)))
     }
 
-    public static func postKey(_ keyCode: CGKeyCode) {
+    public static func postKey(_ keyCode: CGKeyCode, flags: CGEventFlags = []) {
         let source = CGEventSource(stateID: .hidSystemState)
-        CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)?.post(tap: .cghidEventTap)
-        CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)?.post(tap: .cghidEventTap)
+        for isDown in [true, false] {
+            guard let event = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: isDown) else { continue }
+            event.flags = flags
+            event.post(tap: .cghidEventTap)
+        }
     }
 }
