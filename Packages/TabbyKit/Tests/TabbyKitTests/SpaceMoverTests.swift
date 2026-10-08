@@ -34,6 +34,14 @@ struct SpaceMoverTests {
         #expect(system.events.isEmpty)
     }
 
+    @Test func refusesWindowsThatAreOnAllDesktops() async {
+        system.onAllDesktops = true
+        let result = await mover.move(window, toDesktop: 3)
+        #expect(result == .failed(.onAllDesktops, createdDesktops: 0))
+        #expect(system.additions == 0)
+        #expect(system.events.isEmpty)
+    }
+
     @Test func stopsWhenADesktopCannotBeCreated() async {
         system.addCreatesDesktop = false
         let result = await mover.move(window, toDesktop: 3)

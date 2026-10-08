@@ -15,6 +15,13 @@ public final class LiveSpaceSystem: SpaceSystem {
         CGEvent(source: nil)?.location ?? .zero
     }
 
+    public func isOnAllDesktops(_ window: MissionWindow) -> Bool {
+        guard let bundleID = window.bundleID?.lowercased() else { return false }
+        CFPreferencesAppSynchronize("com.apple.spaces" as CFString)
+        let bindings = CFPreferencesCopyAppValue("app-bindings" as CFString, "com.apple.spaces" as CFString) as? [String: Any]
+        return (bindings?[bundleID] as? String) == "AllSpaces"
+    }
+
     public func thumbnailFrame(of window: MissionWindow) -> CGRect? {
         CGWindowSource.bounds(for: [window.id])[window.id]
     }

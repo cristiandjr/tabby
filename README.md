@@ -50,6 +50,7 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 | 🎯 **The exact window** | Focuses the window you picked, even when several windows belong to the same app. |
 | ✨ **See where you are** | The selected window lifts slightly with a soft spring and settles back when you move on. |
 | 🗂️ **Send it to a desktop** | <kbd>⌘</kbd><kbd>1</kbd>…<kbd>⌘</kbd><kbd>9</kbd> moves the selected window to that desktop, creating it if it doesn't exist yet. |
+| ⚙️ **Your shortcuts** | Change every shortcut in Settings. |
 | 🪄 **However you open it** | Shortcut, F3, trackpad gesture or hot corner: Tabby doesn't depend on any of them. |
 | 🍎 **Native** | Swift, SwiftUI and AppKit. A tiny menu bar app that stays out of your way. |
 | 🔒 **Private** | No network, no analytics, no accounts. It only listens to the keyboard while Mission Control is open. |
@@ -137,6 +138,7 @@ Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima
 | 🎯 **La ventana exacta** | Enfoca la ventana que elegiste, aunque haya varias de la misma app. |
 | ✨ **Sabes dónde estás** | La ventana seleccionada se levanta un poco con un resorte suave y vuelve a su lugar al pasar a otra. |
 | 🗂️ **Mándala a un escritorio** | <kbd>⌘</kbd><kbd>1</kbd>…<kbd>⌘</kbd><kbd>9</kbd> mueve la ventana seleccionada a ese escritorio y, si todavía no existe, lo crea. |
+| ⚙️ **Tus atajos** | Cambia cualquier atajo en Configuración. |
 | 🪄 **Como sea que lo abras** | Atajo, F3, gesto o esquina activa: Tabby no depende de ninguno. |
 | 🍎 **Nativa** | Swift, SwiftUI y AppKit. Una app mínima en la barra de menús que no estorba. |
 | 🔒 **Privada** | Sin red, sin analíticas y sin cuentas. Solo escucha el teclado mientras Mission Control está abierto. |

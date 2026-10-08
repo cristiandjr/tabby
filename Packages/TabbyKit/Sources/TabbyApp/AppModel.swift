@@ -1,6 +1,7 @@
 import AppKit
 import Observation
 import ServiceManagement
+import SwiftUI
 import TabbyKit
 
 @MainActor
@@ -18,12 +19,15 @@ final class AppModel {
         didSet { applyLiftsSelection() }
     }
 
+    private(set) var shortcuts = AppModel.loadShortcuts()
+    private(set) var rejectedShortcutIssues: [ShortcutSettings.Issue] = []
     private(set) var hasAccessibility = AX.isTrusted
     private(set) var hasScreenRecording = OverlayPresenter.canCaptureWindows
 
     @ObservationIgnored let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
 
     @ObservationIgnored private static let liftsSelectionKey = "liftsSelection"
+    @ObservationIgnored private static let shortcutsKey = "shortcuts"
     @ObservationIgnored private let presenter = OverlayPresenter()
     @ObservationIgnored private let controller: SessionController
     @ObservationIgnored private let log = Log.logger("app")
@@ -33,6 +37,7 @@ final class AppModel {
     init() {
         controller = SessionController(dependencies: .live(presenter: presenter))
         presenter.liftsSelection = liftsSelection
+        controller.setKeymap(shortcuts.keymap)
         controller.onEvent = { [weak self] event in
             self?.record(event)
         }
@@ -56,6 +61,46 @@ final class AppModel {
     func openAccessibilitySettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    func updateShortcuts(_ change: (inout ShortcutSettings) -> Void) {
+        var candidate = shortcuts
+        change(&candidate)
+        guard candidate.isValid else {
+            rejectedShortcutIssues = candidate.issues
+            return
+        }
+        rejectedShortcutIssues = []
+        shortcuts = candidate
+        controller.setKeymap(candidate.keymap)
+        if let data = try? JSONEncoder().encode(candidate) {
+            UserDefaults.standard.set(data, forKey: Self.shortcutsKey)
+        }
+    }
+
+    func resetShortcuts() {
+        updateShortcuts { $0 = .standard }
+    }
+
+    func showSettings(using openSettings: OpenSettingsAction) {
+        hasScreenRecording = OverlayPresenter.canCaptureWindows
+        hasAccessibility = AX.isTrusted
+        NSApplication.shared.activate()
+        openSettings()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(60))
+            NSApplication.shared.windows
+                .first { !($0 is NSPanel) && $0.isVisible && $0.styleMask.contains(.titled) }?
+                .orderFrontRegardless()
+        }
+    }
+
+    private static func loadShortcuts() -> ShortcutSettings {
+        guard let data = UserDefaults.standard.data(forKey: shortcutsKey),
+              let saved = try? JSONDecoder().decode(ShortcutSettings.self, from: data),
+              saved.isValid
+        else { return .standard }
+        return saved
     }
 
     func requestScreenRecording() {

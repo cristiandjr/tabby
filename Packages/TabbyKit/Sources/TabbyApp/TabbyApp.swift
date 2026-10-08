@@ -10,5 +10,8 @@ struct TabbyApp: App {
         } label: {
             Image(nsImage: MenuBarIcon.image)
         }
+        Settings {
+            SettingsView(model: model)
+        }
     }
 }

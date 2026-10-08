@@ -134,6 +134,7 @@ final class FakeMover: SpaceMoving {
 @MainActor
 final class FakeSpaceSystem: SpaceSystem {
     var pointerLocation = CGPoint(x: 500, y: 500)
+    var onAllDesktops = false
     var thumbnail: CGRect? = CGRect(x: 100, y: 400, width: 300, height: 200)
     var hasBar = true
     var desktopCount = 2
@@ -145,6 +146,10 @@ final class FakeSpaceSystem: SpaceSystem {
     private var drags = 0
     private var dropped = false
     let display = CGRect(x: 0, y: 0, width: 1920, height: 1080)
+
+    func isOnAllDesktops(_ window: MissionWindow) -> Bool {
+        onAllDesktops
+    }
 
     func thumbnailFrame(of window: MissionWindow) -> CGRect? {
         thumbnail
@@ -187,6 +192,7 @@ final class FakeSpaceSystem: SpaceSystem {
 @MainActor
 final class FakeKeyboard: KeyboardIntercepting {
     var onAction: KeyboardInterceptor.ActionHandler?
+    var keymap = Keymap.standard
     var modes: [KeyboardInterceptor.Mode] = []
     var installed = false
 

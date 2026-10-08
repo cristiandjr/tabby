@@ -17,11 +17,11 @@ First preview build.
 - <kbd>⌘</kbd><kbd>1</kbd>…<kbd>⌘</kbd><kbd>9</kbd> inside Mission Control sends the selected window to that desktop of the current display. Missing desktops are created up to that number, and Mission Control stays open so you can keep sorting.
 - Works however you open Mission Control: keyboard shortcut, F3, trackpad gesture or hot corner.
 - Moving the mouse hands the selection back to Mission Control's own hover highlight.
-- Pause, Lift the Selected Window and Launch at Login toggles in the menu.
+- Settings window (<kbd>⌘</kbd><kbd>,</kbd>): pause, launch at login, lift effect, permissions, and custom shortcuts with a recorder. Invalid shortcuts are never saved, and Tabby warns about macOS's own desktop shortcuts.
 
 ### Known issues
 
 - Not notarized yet. The first time, macOS blocks it: open System Settings → Privacy & Security → Open Anyway.
-- Shortcuts are not configurable yet.
+- Windows of apps assigned to *All Desktops* (Dock → Options → Assign To) can't be moved; Tabby tells you how to change it.
 - Moving a window takes about a second: Tabby drags the thumbnail for you and puts the pointer back. Don't move the mouse meanwhile.
 - Fullscreen apps in the desktops bar may shift the desktop numbers.

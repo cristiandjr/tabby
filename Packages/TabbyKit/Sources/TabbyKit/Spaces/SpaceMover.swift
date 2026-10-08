@@ -2,6 +2,7 @@ import CoreGraphics
 
 public enum SpaceMoveFailure: String, Equatable, Sendable {
     case invalidDesktop
+    case onAllDesktops
     case noThumbnail
     case noSpacesBar
     case desktopNotCreated
@@ -48,6 +49,7 @@ public protocol SpaceMoving: AnyObject {
 @MainActor
 public protocol SpaceSystem: AnyObject {
     var pointerLocation: CGPoint { get }
+    func isOnAllDesktops(_ window: MissionWindow) -> Bool
     func thumbnailFrame(of window: MissionWindow) -> CGRect?
     func spacesBar(containing point: CGPoint) -> SpacesBar?
     func addDesktop(containing point: CGPoint)
@@ -82,6 +84,7 @@ public final class SpaceMover: SpaceMoving {
 
     public func move(_ window: MissionWindow, toDesktop number: Int) async -> SpaceMoveResult {
         guard (1...Self.maximumDesktops).contains(number) else { return .failed(.invalidDesktop, createdDesktops: 0) }
+        guard !system.isOnAllDesktops(window) else { return .failed(.onAllDesktops, createdDesktops: 0) }
         guard let thumbnail = system.thumbnailFrame(of: window) else { return .failed(.noThumbnail, createdDesktops: 0) }
         let anchor = CGPoint(x: thumbnail.midX, y: thumbnail.midY)
         guard var bar = system.spacesBar(containing: anchor) else { return .failed(.noSpacesBar, createdDesktops: 0) }

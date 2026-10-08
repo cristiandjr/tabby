@@ -262,6 +262,15 @@ struct SessionControllerTests {
         #expect(presenter.notices.count == 1)
     }
 
+    @Test func explainsWhyAWindowOnAllDesktopsCannotMove() async {
+        mover.result = .failed(.onAllDesktops, createdDesktops: 0)
+        open()
+        controller.perform(.moveToDesktop(2))
+        await Task.yield()
+        await Task.yield()
+        #expect(presenter.notices.first?.contains("Finder") == true)
+    }
+
     @Test func closingMissionControlDuringAMoveEndsTheSession() async {
         open()
         controller.perform(.moveToDesktop(2))

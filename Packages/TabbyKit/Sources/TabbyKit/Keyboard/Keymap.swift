@@ -7,12 +7,7 @@ public struct Keymap: Codable, Hashable, Sendable {
         self.bindings = bindings
     }
 
-    public static let standard = Keymap(bindings: [
-        .next: .next,
-        .previous: .previous,
-        .select: .activate,
-        .selectKeypad: .activate,
-    ].merging(moveToDesktop(modifiers: .command)) { first, _ in first })
+    public static let standard = ShortcutSettings.standard.keymap
 
     public static func moveToDesktop(modifiers: ModifierSet) -> [KeyCombo: SessionAction] {
         KeyCode.digits.enumerated().reduce(into: [:]) { result, item in

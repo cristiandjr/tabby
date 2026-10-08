@@ -20,6 +20,7 @@ public protocol ThumbnailProviding: AnyObject {
 @MainActor
 public protocol KeyboardIntercepting: AnyObject {
     var onAction: KeyboardInterceptor.ActionHandler? { get set }
+    var keymap: Keymap { get set }
     func install() -> Bool
     func uninstall()
     func setMode(_ mode: KeyboardInterceptor.Mode)

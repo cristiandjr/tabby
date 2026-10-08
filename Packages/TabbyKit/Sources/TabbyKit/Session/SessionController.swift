@@ -64,6 +64,10 @@ public final class SessionController {
         return true
     }
 
+    public func setKeymap(_ keymap: Keymap) {
+        dependencies.keyboard.keymap = keymap
+    }
+
     public func stop() {
         pollTask?.cancel()
         pollTask = nil
@@ -190,13 +194,18 @@ public final class SessionController {
         dependencies.presenter.prepare(for: Array(session.windows.values))
         render()
         if case .failed(let failure, _) = result {
-            dependencies.presenter.showNotice(Self.notice(for: failure, desktop: number))
+            dependencies.presenter.showNotice(Self.notice(for: failure, window: window, desktop: number))
         }
         onEvent?(.moved(window, desktop: number, result))
     }
 
-    private static func notice(for failure: SpaceMoveFailure, desktop number: Int) -> String {
+    private static func notice(for failure: SpaceMoveFailure, window: MissionWindow, desktop number: Int) -> String {
         switch failure {
+        case .onAllDesktops:
+            localized(
+                "\(window.appName) is on all desktops. Change it in the Dock: Options → Assign To → None",
+                "\(window.appName) está en todos los escritorios. Cambialo en el Dock: Opciones → Asignar a → Ninguno"
+            )
         case .invalidDesktop:
             localized("macOS allows up to \(SpaceMover.maximumDesktops) desktops", "macOS permite hasta \(SpaceMover.maximumDesktops) escritorios")
         case .desktopNotCreated:
