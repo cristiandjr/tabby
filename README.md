@@ -59,16 +59,17 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 ### Roadmap
 
 - [x] **Spike 0:** validate the macOS capabilities Tabby relies on
-- [ ] **v0.1:** menu bar app with Tab, ⇧Tab and Return *(in progress)*
+- [x] **v0.1.0-alpha.1:** menu bar app with Tab, ⇧Tab and Return, lift effect, desktops and Settings
+- [ ] **v0.1.0:** first stable release
 - [ ] Arrow-key navigation based on the thumbnails' positions
 - [x] Move the selected window to another desktop with a shortcut
 - [ ] Number shortcuts (1–9) and window search
 
 ### Download
 
-There is no release yet. When v0.1 is ready, Tabby will be a single download, with no installer:
+Tabby is a single download, with no installer. The first preview is **v0.1.0-alpha.1**:
 
-1. Download **Tabby.zip** from [Releases](https://github.com/cristiandjr/tabby/releases) and open it.
+1. Download **Tabby.zip** from the [latest release](https://github.com/cristiandjr/tabby/releases) and open it.
 2. Open **Tabby.app**. Tabby isn't notarized yet, so macOS blocks it the first time: go to **System Settings → Privacy & Security** and click **Open Anyway**.
 3. A short welcome tour guides you through the **Accessibility** permission and a first try.
 4. Optional: move Tabby to **Applications**. You only need this for *Launch at Login*.
@@ -154,16 +155,17 @@ Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima
 ### Hoja de ruta
 
 - [x] **Spike 0:** validar las capacidades de macOS que necesita Tabby
-- [ ] **v0.1:** app de barra de menús con Tab, ⇧Tab y Enter *(en curso)*
+- [x] **v0.1.0-alpha.1:** app de barra de menús con Tab, ⇧Tab y Enter, efecto de agrandar, escritorios y Configuración
+- [ ] **v0.1.0:** primera versión estable
 - [ ] Navegación con flechas según la posición de las miniaturas
 - [x] Mover la ventana seleccionada a otro escritorio con un atajo
 - [ ] Atajos numéricos (1–9) y búsqueda de ventanas
 
 ### Descarga
 
-Todavía no hay versiones publicadas. Cuando esté lista la v0.1, Tabby será una sola descarga, sin instalador:
+Tabby es una sola descarga, sin instalador. La primera versión de prueba es la **v0.1.0-alpha.1**:
 
-1. Descarga **Tabby.zip** desde [Releases](https://github.com/cristiandjr/tabby/releases) y ábrelo.
+1. Descarga **Tabby.zip** desde la [última versión](https://github.com/cristiandjr/tabby/releases) y ábrelo.
 2. Abre **Tabby.app**. Como todavía no está notarizada, macOS la bloquea la primera vez: ve a **Configuración del Sistema → Privacidad y seguridad** y haz clic en **Abrir igualmente**.
 3. Una bienvenida corta te guía con el permiso de **Accesibilidad** y una primera prueba.
 4. Opcional: mueve Tabby a **Aplicaciones**. Solo hace falta para *Abrir al iniciar sesión*.

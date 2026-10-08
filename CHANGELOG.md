@@ -4,7 +4,7 @@ All notable changes to Tabby are documented here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
-## [0.1.0-alpha.1] - 2026-10-07
+## [0.1.0-alpha.1] - 2026-10-08
 
 First preview build.
 
