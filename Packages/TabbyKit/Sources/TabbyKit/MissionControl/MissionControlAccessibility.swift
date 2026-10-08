@@ -56,7 +56,7 @@ public enum MissionControlAccessibility {
 
     @MainActor
     public static func thumbnails() -> [MissionControlThumbnail] {
-        displays().flatMap { display in
+        let all = displays().flatMap { display in
             descendants(of: display, maxDepth: 6, maxNodes: 1500) { element in
                 AX.string(element, kAXRoleAttribute) == kAXButtonRole
                     && (AX.string(element, "AXIdentifier")?.contains(".space.") ?? false)
@@ -69,6 +69,13 @@ public enum MissionControlAccessibility {
                 ).map { MissionControlThumbnail(element: element, info: $0) }
             }
         }
+        var seen = Set<String>()
+        return all.filter { seen.insert(deduplicationKey($0.info)).inserted }
+    }
+
+    public static func deduplicationKey(_ info: ThumbnailInfo) -> String {
+        let frame = info.frame.integral
+        return "\(info.bundleID ?? "")|\(info.spaceID ?? "")|\(info.title ?? "")|\(frame.minX),\(frame.minY),\(frame.width),\(frame.height)"
     }
 
     public static func match(windows: [MissionWindow], thumbnails: [ThumbnailInfo]) -> [CGWindowID: Int] {

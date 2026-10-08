@@ -87,12 +87,14 @@ macOS 14 Sonoma or later · Apple Silicon or Intel
 
 ```bash
 swift test --package-path Packages/TabbyKit
-swift build --package-path Packages/TabbyKit -c release
+scripts/build-app.sh
+open build/Tabby.app
 ```
 
 | Path | What it is |
 |---|---|
 | `Packages/TabbyKit` | Core logic: Mission Control detection, keyboard, windows and navigation. |
+| `TabbyApp` | The menu bar app, bundled by `scripts/build-app.sh`. |
 | `tabby-probe` | Guided diagnostic tool that checks what your macOS version allows. See [docs/spikes](docs/spikes/README.md). |
 
 Ideas, issues and pull requests are welcome. If you like the project, a ⭐ helps a lot.
@@ -169,12 +171,14 @@ macOS 14 Sonoma o posterior · Apple Silicon o Intel
 
 ```bash
 swift test --package-path Packages/TabbyKit
-swift build --package-path Packages/TabbyKit -c release
+scripts/build-app.sh
+open build/Tabby.app
 ```
 
 | Ruta | Qué es |
 |---|---|
 | `Packages/TabbyKit` | Lógica principal: detección de Mission Control, teclado, ventanas y navegación. |
+| `TabbyApp` | La app de barra de menús, empaquetada por `scripts/build-app.sh`. |
 | `tabby-probe` | Herramienta de diagnóstico guiada que comprueba qué permite tu versión de macOS. Ver [docs/spikes](docs/spikes/README.md). |
 
 Las ideas, los issues y los pull requests son bienvenidos. Si te gusta el proyecto, una ⭐ ayuda muchísimo.

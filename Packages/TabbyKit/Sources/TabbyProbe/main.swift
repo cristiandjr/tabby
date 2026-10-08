@@ -8,9 +8,13 @@ if arguments.contains("--help") || arguments.contains("-h") {
         """
         tabby-probe · Spike 0 diagnostics for Tabby
 
-        Usage: tabby-probe [run|check|dump] [--out <directory>]
+        Usage: tabby-probe [run|auto|demo|check|dump] [--out <directory>]
 
           run    Guided test (default)
+          auto   Automated test: drives Mission Control by itself and verifies the results
+          demo   Try Tabby: Tab / ⇧Tab / Return inside Mission Control until Ctrl+C (--selftest drives it once)
+          geometry  Sample thumbnail frames while Mission Control opens
+          drive  Drive Tabby.app (Mission Control + Tab + Return) and verify the focused window
           check  Print permissions and environment
           dump   Save the Dock accessibility tree while Mission Control is open
         """
@@ -29,7 +33,7 @@ let baseDirectory: URL = {
 let formatter = DateFormatter()
 formatter.dateFormat = "yyyyMMdd-HHmmss"
 let outputDirectory = baseDirectory.appendingPathComponent(formatter.string(from: Date()), isDirectory: true)
-if command != .check {
+if command != .check, command != .demo, command != .geometry, command != .drive {
     try? FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 }
 

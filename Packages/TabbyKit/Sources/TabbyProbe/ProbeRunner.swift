@@ -5,6 +5,9 @@ import TabbyKit
 enum ProbeCommand: String {
     case run
     case auto
+    case demo
+    case geometry
+    case drive
     case check
     case dump
 }
@@ -83,6 +86,12 @@ final class ProbeRunner {
             return await guided()
         case .auto:
             return await AutoRunner(outputDirectory: outputDirectory).run()
+        case .demo:
+            return await DemoRunner(selfTest: CommandLine.arguments.contains("--selftest")).run()
+        case .geometry:
+            return await GeometryProbe.run()
+        case .drive:
+            return await DriveProbe.run()
         }
     }
 

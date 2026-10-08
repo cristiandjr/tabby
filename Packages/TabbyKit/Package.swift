@@ -6,10 +6,12 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "TabbyKit", targets: ["TabbyKit"]),
+        .executable(name: "Tabby", targets: ["TabbyApp"]),
         .executable(name: "tabby-probe", targets: ["TabbyProbe"]),
     ],
     targets: [
         .target(name: "TabbyKit"),
+        .executableTarget(name: "TabbyApp", dependencies: ["TabbyKit"]),
         .executableTarget(name: "TabbyProbe", dependencies: ["TabbyKit"]),
         .testTarget(name: "TabbyKitTests", dependencies: ["TabbyKit"]),
     ]
