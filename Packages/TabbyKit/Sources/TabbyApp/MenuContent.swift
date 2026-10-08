@@ -18,6 +18,7 @@ struct MenuContent: View {
             model.openMissionControl()
         }
         Divider()
+        Text(localized("Version \(model.version)", "Versión \(model.version)"))
         Button(localized("Quit Tabby", "Salir de Tabby")) {
             NSApplication.shared.terminate(nil)
         }

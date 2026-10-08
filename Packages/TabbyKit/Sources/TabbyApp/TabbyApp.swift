@@ -5,8 +5,10 @@ struct TabbyApp: App {
     @State private var model = AppModel()
 
     var body: some Scene {
-        MenuBarExtra("Tabby", systemImage: "macwindow") {
+        MenuBarExtra {
             MenuContent(model: model)
+        } label: {
+            Image(nsImage: MenuBarIcon.image)
         }
     }
 }

@@ -19,7 +19,8 @@ enum DriveProbe {
         var passed = 0
         say("drive: \(cycles) cycles against Tabby.app")
         for index in 0..<cycles {
-            let order = provider.snapshot().map(\.id)
+            let all = provider.snapshot()
+            let order = all.filter { $0.displayID == all.first?.displayID }.map(\.id)
             guard order.count >= 2 else {
                 say("  at least 2 windows are needed")
                 break

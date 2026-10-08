@@ -8,6 +8,7 @@ enum ProbeCommand: String {
     case demo
     case geometry
     case drive
+    case sniff
     case check
     case dump
 }
@@ -92,6 +93,8 @@ final class ProbeRunner {
             return await GeometryProbe.run()
         case .drive:
             return await DriveProbe.run()
+        case .sniff:
+            return await NotificationSniffer.run()
         }
     }
 

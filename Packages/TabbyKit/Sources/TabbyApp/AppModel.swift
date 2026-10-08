@@ -16,6 +16,8 @@ final class AppModel {
 
     private(set) var hasAccessibility = AX.isTrusted
 
+    @ObservationIgnored let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+
     @ObservationIgnored private let controller = SessionController()
     @ObservationIgnored private let log = Log.logger("app")
     @ObservationIgnored private var permissionTask: Task<Void, Never>?

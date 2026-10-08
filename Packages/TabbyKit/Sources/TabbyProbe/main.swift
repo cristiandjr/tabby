@@ -33,7 +33,7 @@ let baseDirectory: URL = {
 let formatter = DateFormatter()
 formatter.dateFormat = "yyyyMMdd-HHmmss"
 let outputDirectory = baseDirectory.appendingPathComponent(formatter.string(from: Date()), isDirectory: true)
-if command != .check, command != .demo, command != .geometry, command != .drive {
+if [.run, .auto, .dump].contains(command) {
     try? FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 }
 

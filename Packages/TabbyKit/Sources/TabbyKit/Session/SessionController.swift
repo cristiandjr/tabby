@@ -28,6 +28,7 @@ public final class SessionController {
     private let interceptor = KeyboardInterceptor()
     private let provider = WindowProvider()
     private let overlay = SelectionOverlay()
+    private let monitor = MissionControlMonitor()
     private var pollTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var missionControlOpen = false
@@ -35,6 +36,9 @@ public final class SessionController {
     private var renderedFrame: CGRect?
     private var highlightShown = false
     private var openedAt: ContinuousClock.Instant?
+    private var mouseMonitor: Any?
+    private var mouseAnchor: NSPoint?
+    private var mouseTookOver = false
     private var engine: NavigationEngine?
     private var windows: [CGWindowID: MissionWindow] = [:]
     private var thumbnails: [CGWindowID: MissionControlThumbnail] = [:]
@@ -43,7 +47,7 @@ public final class SessionController {
     public init() {}
 
     @discardableResult
-    public func start(pollInterval: Duration = .milliseconds(50)) -> Bool {
+    public func start(pollInterval: Duration = .milliseconds(100)) -> Bool {
         guard !isRunning else { return true }
         guard AX.isTrusted else { return false }
         AX.setGlobalTimeout(0.3)
@@ -53,7 +57,7 @@ public final class SessionController {
         guard interceptor.install() else { return false }
         pollTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: pollInterval)
+                try? await Task.sleep(for: pollInterval, tolerance: pollInterval / 4)
                 guard let self else { return }
                 self.poll()
             }
@@ -71,9 +75,8 @@ public final class SessionController {
     }
 
     private func poll() {
-        let signature = DockAccessibility.topLevelSignature()
-        guard !signature.isEmpty else { return }
-        if DockAccessibility.isMissionControlOpen(signature) {
+        guard let open = monitor.isOpen() else { return }
+        if open {
             closedReadings = 0
             guard !missionControlOpen else { return }
             missionControlOpen = true
@@ -89,7 +92,9 @@ public final class SessionController {
     }
 
     private func beginSession() {
-        let snapshot = provider.snapshot()
+        let allWindows = provider.snapshot()
+        let display = allWindows.first?.displayID ?? Self.displayUnderMouse()
+        let snapshot = allWindows.filter { $0.displayID == display }
         guard !snapshot.isEmpty else { return }
         windows = Dictionary(snapshot.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         engine = NavigationEngine(windowIDs: snapshot.map(\.id))
@@ -97,11 +102,48 @@ public final class SessionController {
         renderedFrame = nil
         highlightShown = false
         openedAt = ContinuousClock().now
+        mouseTookOver = false
+        mouseAnchor = NSEvent.mouseLocation
         resolveThumbnails()
         interceptor.setMode(.intercept)
         render()
         onEvent?(.opened(windows: snapshot.count))
         startRefreshing()
+        startWatchingMouse()
+    }
+
+    private static func displayUnderMouse() -> CGDirectDisplayID {
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let location = NSEvent.mouseLocation
+        var display: CGDirectDisplayID = 0
+        var count: UInt32 = 0
+        CGGetDisplaysWithPoint(CGPoint(x: location.x, y: primaryHeight - location.y), 1, &display, &count)
+        return count > 0 ? display : CGMainDisplayID()
+    }
+
+    private func startWatchingMouse() {
+        stopWatchingMouse()
+        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.mouseMoved()
+            }
+        }
+    }
+
+    private func stopWatchingMouse() {
+        if let mouseMonitor {
+            NSEvent.removeMonitor(mouseMonitor)
+        }
+        mouseMonitor = nil
+    }
+
+    private func mouseMoved() {
+        guard engine != nil, !mouseTookOver, let mouseAnchor else { return }
+        let location = NSEvent.mouseLocation
+        guard hypot(location.x - mouseAnchor.x, location.y - mouseAnchor.y) > 8 else { return }
+        mouseTookOver = true
+        overlay.showHighlight(globalRect: nil)
+        highlightShown = false
     }
 
     private func startRefreshing() {
@@ -113,7 +155,7 @@ public final class SessionController {
                 tick += 1
                 guard let self, self.engine != nil, !self.activating else { return }
                 self.resolveThumbnails()
-                if self.selectedFrame() != self.renderedFrame || (!self.highlightShown && self.openingAnimationFinished) {
+                if self.selectedFrame() != self.renderedFrame || (!self.highlightShown && self.openingAnimationFinished && !self.mouseTookOver) {
                     self.render()
                 }
             }
@@ -133,6 +175,7 @@ public final class SessionController {
         let wasActive = engine != nil
         refreshTask?.cancel()
         refreshTask = nil
+        stopWatchingMouse()
         interceptor.setMode(.off)
         overlay.hide()
         engine = nil
@@ -157,7 +200,7 @@ public final class SessionController {
         let title = window.title.map { " — \($0)" } ?? ""
         let frame = thumbnails[id]?.info.frame
         renderedFrame = frame
-        if let frame, openingAnimationFinished {
+        if let frame, openingAnimationFinished, !mouseTookOver {
             let scale = frame.width / max(window.frame.width, 1)
             overlay.showHighlight(globalRect: frame, cornerRadius: min(max(20 * scale, 8), 44))
             highlightShown = true
@@ -173,15 +216,22 @@ public final class SessionController {
         switch key {
         case .next:
             engine?.next()
+            reclaimFromMouse()
             render()
             notifySelection()
         case .previous:
             engine?.previous()
+            reclaimFromMouse()
             render()
             notifySelection()
         case .select:
             activate()
         }
+    }
+
+    private func reclaimFromMouse() {
+        mouseTookOver = false
+        mouseAnchor = NSEvent.mouseLocation
     }
 
     private func notifySelection() {
