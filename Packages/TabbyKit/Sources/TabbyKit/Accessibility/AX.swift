@@ -68,6 +68,35 @@ public enum AX {
         return (names as? [String]) ?? []
     }
 
+    public static func attributeNames(_ element: AXUIElement) -> [String] {
+        var names: CFArray?
+        guard AXUIElementCopyAttributeNames(element, &names) == .success, let names else { return [] }
+        return (names as? [String]) ?? []
+    }
+
+    public static func parameterizedAttributeNames(_ element: AXUIElement) -> [String] {
+        var names: CFArray?
+        guard AXUIElementCopyParameterizedAttributeNames(element, &names) == .success, let names else { return [] }
+        return (names as? [String]) ?? []
+    }
+
+    public static func pid(_ element: AXUIElement) -> pid_t? {
+        var pid: pid_t = 0
+        return AXUIElementGetPid(element, &pid) == .success ? pid : nil
+    }
+
+    public static func describe(_ value: CFTypeRef?) -> String {
+        guard let value else { return "nil" }
+        if CFGetTypeID(value) == AXUIElementGetTypeID() {
+            let element = value as! AXUIElement
+            return "<\(string(element, kAXRoleAttribute) ?? "?") \(string(element, "AXIdentifier") ?? "")>"
+        }
+        if let array = value as? [AnyObject] {
+            return "[\(array.count): " + array.prefix(5).map { describe($0) }.joined(separator: ", ") + "]"
+        }
+        return String(describing: value)
+    }
+
     @discardableResult
     public static func perform(_ element: AXUIElement, _ action: String) -> AXError {
         AXUIElementPerformAction(element, action as CFString)

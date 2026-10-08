@@ -27,7 +27,21 @@ final class ProbeRunner {
 
     private let console = Console()
     private let log = Log.logger("probe", subsystem: "io.github.cristiandjr.tabby.spike")
+    private static let dockNotifications = [
+        "AXCreated",
+        "AXUIElementDestroyed",
+        "AXLayoutChanged",
+        "AXFocusedUIElementChanged",
+        "AXSelectedChildrenChanged",
+        "AXValueChanged",
+        "AXTitleChanged",
+        "AXWindowCreated",
+        "AXMoved",
+        "AXResized",
+    ]
+
     private let observer = MissionControlObserver()
+    private let dockSniffer = AXNotificationObserver()
     private let interceptor = KeyboardInterceptor()
     private let provider = WindowProvider()
     private let overlay = SelectionOverlay()
@@ -38,10 +52,9 @@ final class ProbeRunner {
     private var phase: Phase = .idle
     private var missionControlOpen = false
     private var notificationsSeen = false
-    private var fallbackOpen = false
-    private var dockBaselineCount = 0
     private var dockSignature: [String] = []
     private var pollTask: Task<Void, Never>?
+    private var dockNotificationsLogged = 0
     private var lastKeyDown: (code: UInt16, modifiers: ModifierSet, at: ContinuousClock.Instant)?
     private var dumpedDuringDetection = false
     private var referenceWindowIDs: Set<CGWindowID> = []
@@ -138,6 +151,12 @@ final class ProbeRunner {
         if registration.isEmpty {
             report.observerRegistration["observer"] = "failed"
         }
+        dockSniffer.onNotification = { [weak self] name, element, instant in
+            self?.recordDockNotification(name, element: element, at: instant)
+        }
+        if let pid = DockAccessibility.pid {
+            report.dockNotificationRegistration = dockSniffer.start(pid: pid, notifications: Self.dockNotifications)
+        }
         interceptor.onKey = { [weak self] key in
             self?.handleKey(key)
         }
@@ -152,11 +171,11 @@ final class ProbeRunner {
 
     private func startDockPolling() {
         dockSignature = DockAccessibility.topLevelSignature()
-        dockBaselineCount = dockSignature.count
         report.dockBaseline = dockSignature
+        report.dockWindowsBaseline = dockWindowsDescription()
         pollTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(250))
+                try? await Task.sleep(for: .milliseconds(100))
                 guard let self else { return }
                 self.pollDock()
             }
@@ -166,27 +185,51 @@ final class ProbeRunner {
     private func pollDock() {
         let signature = DockAccessibility.topLevelSignature()
         guard signature != dockSignature else { return }
+        let wasOpen = DockAccessibility.isMissionControlOpen(dockSignature)
+        let isOpen = DockAccessibility.isMissionControlOpen(signature)
         dockSignature = signature
-        let expanded = signature.count > dockBaselineCount
         let now = ContinuousClock().now
+        let name = isOpen == wasOpen ? "dockTreeChanged" : (isOpen ? "missionControlGroupAppeared" : "missionControlGroupRemoved")
         report.events.append(.init(
-            name: expanded ? "dockTreeExpanded" : "dockTreeRestored",
+            name: name,
             atMs: milliseconds(from: startedAt, to: now),
             phase: phase.rawValue,
             detail: signature.joined(separator: ", ")
         ))
-        console.say("  · " + t("Dock tree changed: ", "Cambió el árbol del Dock: ") + signature.joined(separator: ", "))
+        guard isOpen != wasOpen else {
+            console.say("  · " + t("Dock tree changed (not Mission Control): ", "Cambió el árbol del Dock (no es Mission Control): ") + signature.joined(separator: ", "))
+            return
+        }
         guard !notificationsSeen else { return }
-        if expanded, !fallbackOpen {
-            fallbackOpen = true
+        if isOpen {
             missionControlOpen = true
-            console.say("  ● " + t("Mission Control opened (detected through the Dock tree)", "Mission Control abierto (detectado por el árbol del Dock)"))
+            console.say("  ● " + t("Mission Control opened", "Mission Control abierto"))
             missionControlOpened(at: now, detectedBy: "dockTree")
-        } else if !expanded, fallbackOpen {
-            fallbackOpen = false
+        } else {
             missionControlOpen = false
-            console.say("  ○ " + t("Mission Control closed (Dock tree)", "Mission Control cerrado (árbol del Dock)"))
+            console.say("  ○ " + t("Mission Control closed", "Mission Control cerrado"))
             missionControlClosed(at: now)
+        }
+    }
+
+    private func recordDockNotification(_ name: String, element: AXUIElement, at instant: ContinuousClock.Instant) {
+        report.dockNotificationCounts[name, default: 0] += 1
+        guard dockNotificationsLogged < 400 else { return }
+        dockNotificationsLogged += 1
+        let role = AX.string(element, kAXRoleAttribute) ?? "?"
+        let identifier = AX.string(element, "AXIdentifier").map { ":\($0)" } ?? ""
+        report.events.append(.init(
+            name: "dock:\(name)",
+            atMs: milliseconds(from: startedAt, to: instant),
+            phase: phase.rawValue,
+            detail: role + identifier
+        ))
+    }
+
+    private func dockWindowsDescription() -> [String] {
+        guard let pid = DockAccessibility.pid else { return [] }
+        return CGWindowSource.onScreen().filter { $0.pid == pid }.map { record in
+            "layer=\(record.layer) (\(Int(record.bounds.minX)),\(Int(record.bounds.minY)) \(Int(record.bounds.width))x\(Int(record.bounds.height))) alpha=\(record.alpha)"
         }
     }
 
@@ -248,8 +291,8 @@ final class ProbeRunner {
     private func stepGuidedDump() async {
         console.title(t("Step 3/5 · Dock snapshot", "Paso 3/5 · Foto del Dock"))
         console.say(t(
-            "After you press Return (↩), open Mission Control and leave it open. In 5 seconds the probe saves the Dock accessibility tree.",
-            "Después de presionar Enter (↩), abrí Mission Control y dejalo abierto. En 5 segundos el probe guarda el árbol de accesibilidad del Dock."
+            "After you press Return (↩), open Mission Control and leave it open, without moving the mouse, until you see \"Saved\" (about 10 seconds).",
+            "Después de presionar Enter (↩), abrí Mission Control y dejalo abierto, sin mover el mouse, hasta que aparezca \"Guardado\" (unos 10 segundos)."
         ))
         await console.waitForReturn(t("Press Return (↩) to start the countdown.", "Presioná Enter (↩) para empezar la cuenta regresiva."))
         for remaining in stride(from: 5, through: 1, by: -1) {
@@ -258,8 +301,104 @@ final class ProbeRunner {
         }
         saveDockTree(label: "guided")
         captureWindowsDuringMissionControl()
+        report.dockWindowsDuringMissionControl = dockWindowsDescription()
+        await exploreMissionControl()
         console.say(t("Saved. You can close Mission Control now.", "Guardado. Ya podés cerrar Mission Control."))
         try? await Task.sleep(for: .seconds(2))
+    }
+
+    private func exploreMissionControl() async {
+        var lines = ["# Mission Control exploration", ""]
+        guard let pid = DockAccessibility.pid, let group = DockAccessibility.missionControlElement() else {
+            lines.append("Mission Control group not found. Was Mission Control open?")
+            writeExploration(lines)
+            console.say("    " + t("Mission Control was not open during the snapshot.", "Mission Control no estaba abierto durante la foto."))
+            return
+        }
+        lines.append("## Group attributes")
+        lines += AX.attributeNames(group).sorted().map { "- \($0) = \(AX.describe(AX.raw(group, $0)))" }
+        lines.append("")
+        lines.append("## Parameterized attributes: " + AX.parameterizedAttributeNames(group).joined(separator: ", "))
+        lines.append("## Actions: " + AX.actions(group).joined(separator: ", "))
+
+        var counts: [String: Int] = [:]
+        for attribute in ["AXChildren", "AXChildrenInNavigationOrder", "AXVisibleChildren", "AXContents", "AXRows", "AXSelectedChildren"] {
+            counts[attribute] = AX.elements(group, attribute).count
+        }
+
+        let application = AX.application(pid)
+        let enhancedBefore = AX.bool(application, "AXEnhancedUserInterface")
+        let enhancedResult = AX.set(application, "AXEnhancedUserInterface", kCFBooleanTrue)
+        try? await Task.sleep(for: .milliseconds(400))
+        if let enhancedGroup = DockAccessibility.missionControlElement() {
+            let children = AX.elements(enhancedGroup, kAXChildrenAttribute)
+            counts["AXChildren (AXEnhancedUserInterface)"] = children.count
+            if !children.isEmpty {
+                lines.append("")
+                lines.append("## Subtree with AXEnhancedUserInterface")
+                lines.append(DockAccessibility.render(DockAccessibility.subtree(of: enhancedGroup)))
+            }
+        }
+        AX.set(application, "AXEnhancedUserInterface", enhancedBefore == true ? kCFBooleanTrue : kCFBooleanFalse)
+
+        let manualResult = AX.set(application, "AXManualAccessibility", kCFBooleanTrue)
+        try? await Task.sleep(for: .milliseconds(400))
+        if let manualGroup = DockAccessibility.missionControlElement() {
+            let children = AX.elements(manualGroup, kAXChildrenAttribute)
+            counts["AXChildren (AXManualAccessibility)"] = children.count
+            if !children.isEmpty {
+                lines.append("")
+                lines.append("## Subtree with AXManualAccessibility")
+                lines.append(DockAccessibility.render(DockAccessibility.subtree(of: manualGroup)))
+            }
+        }
+        AX.set(application, "AXManualAccessibility", kCFBooleanFalse)
+        report.missionControlChildren = counts
+
+        lines.append("")
+        lines.append("## Children counts")
+        lines += counts.sorted { $0.key < $1.key }.map { "- \($0.key): \($0.value)" }
+        lines.append("- set AXEnhancedUserInterface: \(enhancedResult.name) · set AXManualAccessibility: \(manualResult.name)")
+
+        let samples = DockAccessibility.hitTest(points: gridPoints())
+        report.hitTestSamples = samples.count
+        for sample in samples {
+            report.hitTestOwners[sample.owner ?? sample.status, default: 0] += 1
+        }
+        let dockElements = samples.filter { $0.owner == "Dock" && $0.identifier != DockAccessibility.missionControlIdentifier && $0.role != "AXApplication" }
+        report.hitTestDockElements = Array(Set(dockElements.map { "\($0.role ?? "?") id=\($0.identifier ?? "-") title=\($0.title ?? "-") desc=\($0.label ?? "-")" })).sorted()
+        lines.append("")
+        lines.append("## Hit test (\(samples.count) points)")
+        lines += samples.map { "- " + $0.summary }
+
+        lines.append("")
+        lines.append("## Dock windows in the Window Server")
+        lines.append("- before: " + report.dockWindowsBaseline.joined(separator: " | "))
+        lines.append("- during Mission Control: " + report.dockWindowsDuringMissionControl.joined(separator: " | "))
+        writeExploration(lines)
+        console.say("    " + t(
+            "Exploration saved: mc children \(counts.values.max() ?? 0), hit-test Dock elements \(report.hitTestDockElements.count)",
+            "Exploración guardada: hijos de mc \(counts.values.max() ?? 0), elementos del Dock por hit-test \(report.hitTestDockElements.count)"
+        ))
+    }
+
+    private func writeExploration(_ lines: [String]) {
+        try? lines.joined(separator: "\n").write(to: outputDirectory.appendingPathComponent("mc-exploration.md"), atomically: true, encoding: .utf8)
+    }
+
+    private func gridPoints(columns: Int = 8, rows: Int = 6) -> [CGPoint] {
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        return NSScreen.screens.flatMap { screen -> [CGPoint] in
+            let frame = ScreenGeometry.globalRect(fromAppKit: screen.frame, primaryScreenHeight: primaryHeight)
+            return (0..<rows).flatMap { row in
+                (0..<columns).map { column in
+                    CGPoint(
+                        x: frame.minX + frame.width * (CGFloat(column) + 0.5) / CGFloat(columns),
+                        y: frame.minY + frame.height * (CGFloat(row) + 0.5) / CGFloat(rows)
+                    )
+                }
+            }
+        }
     }
 
     private func stepNativeKeys() async {
@@ -296,6 +435,7 @@ final class ProbeRunner {
         console.title(t("Step 5/5 · Tabby demo", "Paso 5/5 · Demo de Tabby"))
         console.say(t(
             """
+            This is the most important step.
             Now Tabby takes over Tab and Return (↩) while Mission Control is open.
             Repeat at least 6 times:
               1. Open Mission Control.
@@ -305,6 +445,7 @@ final class ProbeRunner {
             Esc cancels. Each result is printed here.
             """,
             """
+            Este es el paso más importante.
             Ahora Tabby toma Tab y Enter (↩) mientras Mission Control está abierto.
             Repetí al menos 6 veces:
               1. Abrí Mission Control.
@@ -314,8 +455,17 @@ final class ProbeRunner {
             Esc cancela. Cada resultado aparece acá.
             """
         ))
-        await console.waitForReturn(t("When you are done, come back to Terminal and press Return (↩) here.", "Cuando termines, volvé a Terminal y presioná Enter (↩) acá."))
-        endSession(reason: "stepEnded")
+        while true {
+            await console.waitForReturn(t("When you are done, come back to Terminal and press Return (↩) here.", "Cuando termines, volvé a Terminal y presioná Enter (↩) acá."))
+            endSession(reason: "stepEnded")
+            if !report.sessions.isEmpty { break }
+            let retry = await console.askYesNo(t(
+                "I did not detect Mission Control during this step. Try it again?",
+                "No detecté Mission Control durante este paso. ¿Lo intentamos de nuevo?"
+            ))
+            guard retry == true else { break }
+            console.say(t("Open Mission Control now, press Tab and then Return (↩).", "Abrí Mission Control ahora, presioná Tab y después Enter (↩)."))
+        }
         phase = .idle
         guard !report.sessions.isEmpty else {
             console.say(t("No Mission Control session was detected during the demo.", "No se detectó ninguna sesión de Mission Control durante la demo."))
@@ -592,6 +742,7 @@ final class ProbeRunner {
     private func finish() {
         pollTask?.cancel()
         observer.stop()
+        dockSniffer.stop()
         interceptor.setMode(.off)
         overlay.hide()
         report.finishedAt = Date()

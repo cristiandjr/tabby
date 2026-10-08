@@ -21,10 +21,78 @@ public struct DockCandidate {
     public let frame: CGRect
 }
 
+public struct HitTestSample: Codable, Sendable {
+    public var point: CGPoint
+    public var status: String
+    public var role: String?
+    public var subrole: String?
+    public var identifier: String?
+    public var title: String?
+    public var label: String?
+    public var owner: String?
+    public var frame: CGRect?
+    public var actions: [String]
+
+    public var summary: String {
+        var parts = ["(\(Int(point.x)),\(Int(point.y)))", status == "success" ? (role ?? "?") : status]
+        if let subrole { parts.append("subrole=\(subrole)") }
+        if let identifier { parts.append("id=\(identifier)") }
+        if let title, !title.isEmpty { parts.append("title=\"\(title)\"") }
+        if let label, !label.isEmpty { parts.append("desc=\"\(label)\"") }
+        if let owner { parts.append("owner=\(owner)") }
+        if let frame { parts.append("frame=(\(Int(frame.minX)),\(Int(frame.minY)) \(Int(frame.width))x\(Int(frame.height)))") }
+        if !actions.isEmpty { parts.append("actions=\(actions.joined(separator: ","))") }
+        return parts.joined(separator: " ")
+    }
+}
+
 public enum DockAccessibility {
     public static let bundleID = "com.apple.dock"
+    public static let missionControlIdentifier = "mc"
     static let dockItemRole = "AXDockItem"
     static let identifierAttribute = "AXIdentifier"
+
+    public static func isMissionControlOpen(_ signature: [String]) -> Bool {
+        signature.contains("AXGroup:\(missionControlIdentifier)")
+    }
+
+    @MainActor
+    public static func missionControlElement() -> AXUIElement? {
+        guard let pid else { return nil }
+        return AX.elements(AX.application(pid), kAXChildrenAttribute).first {
+            AX.string($0, identifierAttribute) == missionControlIdentifier
+        }
+    }
+
+    @MainActor
+    public static func subtree(of element: AXUIElement, maxDepth: Int = 12, maxNodes: Int = 2000) -> AXNode {
+        var budget = maxNodes
+        return node(for: element, depth: 0, maxDepth: maxDepth, budget: &budget)
+    }
+
+    @MainActor
+    public static func hitTest(points: [CGPoint]) -> [HitTestSample] {
+        let systemWide = AXUIElementCreateSystemWide()
+        return points.map { point in
+            var found: AXUIElement?
+            let status = AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &found)
+            guard status == .success, let element = found else {
+                return HitTestSample(point: point, status: status.name, actions: [])
+            }
+            return HitTestSample(
+                point: point,
+                status: status.name,
+                role: AX.string(element, kAXRoleAttribute),
+                subrole: AX.string(element, kAXSubroleAttribute),
+                identifier: AX.string(element, identifierAttribute),
+                title: AX.string(element, kAXTitleAttribute),
+                label: AX.string(element, kAXDescriptionAttribute),
+                owner: AX.pid(element).flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName },
+                frame: AX.frame(element),
+                actions: AX.actions(element)
+            )
+        }
+    }
 
     @MainActor
     public static var pid: pid_t? {

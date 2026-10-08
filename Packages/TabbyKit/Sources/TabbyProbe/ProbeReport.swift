@@ -84,7 +84,7 @@ struct ProbeReport: Codable {
         var detail: [String: String]
     }
 
-    var tool = "tabby-probe 0.2"
+    var tool = "tabby-probe 0.3"
     var startedAt = Date()
     var finishedAt: Date?
     var macOS = SystemStatus.macOSVersion
@@ -92,9 +92,17 @@ struct ProbeReport: Codable {
     var privateWindowAPI = PrivateAXBridge.isAvailable
     var screens: [Screen] = []
     var observerRegistration: [String: String] = [:]
+    var dockNotificationRegistration: [String: String] = [:]
+    var dockNotificationCounts: [String: Int] = [:]
     var tapInstalled = false
     var tapTimeouts = 0
     var dockBaseline: [String] = []
+    var dockWindowsBaseline: [String] = []
+    var dockWindowsDuringMissionControl: [String] = []
+    var missionControlChildren: [String: Int] = [:]
+    var hitTestSamples = 0
+    var hitTestOwners: [String: Int] = [:]
+    var hitTestDockElements: [String] = []
     var windowsBefore = WindowSummary()
     var windowsDuringMissionControl = WindowSummary()
     var events: [Event] = []
@@ -113,18 +121,22 @@ extension ProbeReport {
         let detection = report.events.filter { $0.phase == "detection" }
         let opens = detection.filter { $0.name == MissionControlEvent.showAllWindows.rawValue }.count
         let exits = detection.filter { $0.name == MissionControlEvent.exit.rawValue }.count
-        let dockChanges = report.events.filter { $0.name == "dockTreeExpanded" }.count
+        let dockOpens = detection.filter { $0.name == "missionControlGroupAppeared" }.count
+        let latencies = report.triggers.map(\.latencyMs).sorted()
+        let median = latencies.isEmpty ? nil : latencies[latencies.count / 2]
+        let mcNotifications = Set(report.events.filter { $0.name.hasPrefix("dock:") && ($0.detail ?? "").hasSuffix(":mc") }.map(\.name)).sorted()
         let registered = report.observerRegistration[MissionControlEvent.showAllWindows.rawValue] == "success"
             && report.observerRegistration[MissionControlEvent.exit.rawValue] == "success"
         if registered && opens >= 4 && exits >= opens {
             verdicts["H1 detection"] = "pass (\(opens) opens)"
         } else if opens > 0 {
             verdicts["H1 detection"] = "partial (\(opens) opens, \(exits) exits)"
-        } else if dockChanges > 0 {
-            verdicts["H1 detection"] = "notifications silent; Dock tree fallback saw \(dockChanges) openings"
+        } else if dockOpens > 0 {
+            verdicts["H1 detection"] = "AXExpose notifications silent; mc group polling saw \(dockOpens) openings, median \(median.map { "\(Int($0)) ms" } ?? "?")"
         } else {
             verdicts["H1 detection"] = "fail"
         }
+        verdicts["H1 event-driven candidates"] = mcNotifications.isEmpty ? "none" : mcNotifications.joined(separator: ", ")
 
         let before = report.windowsBefore
         let during = report.windowsDuringMissionControl
@@ -133,7 +145,14 @@ extension ProbeReport {
 
         let thumbnails = report.sessions.map(\.thumbnailsFound).max() ?? 0
         let pressable = report.dockTrees.map(\.pressable).max() ?? 0
-        verdicts["H3 thumbnails"] = thumbnails > 0 ? "pass (\(thumbnails) matched)" : (pressable > 0 ? "review (\(pressable) pressable)" : "fail")
+        let exposedChildren = report.missionControlChildren.values.max() ?? 0
+        if thumbnails > 0 {
+            verdicts["H3 thumbnails"] = "pass (\(thumbnails) matched)"
+        } else if exposedChildren > 0 || !report.hitTestDockElements.isEmpty || pressable > 0 {
+            verdicts["H3 thumbnails"] = "review (mc children \(exposedChildren), hit-test Dock elements \(report.hitTestDockElements.count), pressable \(pressable))"
+        } else {
+            verdicts["H3 thumbnails"] = report.missionControlChildren.isEmpty ? "fail" : "fail (mc group empty, hit-test found no thumbnails)"
+        }
 
         verdicts["H4 thumbnail action"] = rate(of: .dockThumbnail, in: report.attempts)
         verdicts["H5 accessibility activation"] = rate(of: .accessibility, in: report.attempts)
