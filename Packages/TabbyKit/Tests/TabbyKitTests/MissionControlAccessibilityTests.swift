@@ -41,12 +41,27 @@ struct MissionControlAccessibilityTests {
         #expect(matches[2] == 0)
     }
 
-    @Test func fallsBackToTheClosestAspectRatioWithinTheSameApp() {
-        let windows = [window(1, "com.brave.Browser", nil, width: 1600, height: 900), window(2, "com.brave.Browser", nil, width: 600, height: 900)]
-        let thumbnails = [thumbnail("com.brave.Browser", "Tall", width: 200, height: 300), thumbnail("com.brave.Browser", "Wide", width: 320, height: 180)]
+    @Test func matchesByWindowIDFirst() {
+        let windows = [window(1782, "com.apple.finder", "Recientes"), window(1790, "com.apple.finder", "Recientes")]
+        let thumbnails = [
+            ThumbnailInfo(bundleID: "com.apple.finder", spaceID: "5", title: "Recientes", frame: .zero, windowID: 1790),
+            ThumbnailInfo(bundleID: "com.apple.finder", spaceID: "5", title: "Recientes", frame: .zero, windowID: 1782),
+        ]
         let matches = MissionControlAccessibility.match(windows: windows, thumbnails: thumbnails)
-        #expect(matches[1] == 1)
-        #expect(matches[2] == 0)
+        #expect(matches[1782] == 1)
+        #expect(matches[1790] == 0)
+    }
+
+    @Test func neverMatchesAThumbnailThatBelongsToAnotherWindow() {
+        let windows = [window(73, "com.brave.Browser", "cristiandjr/tabby")]
+        let thumbnails = [ThumbnailInfo(bundleID: "com.brave.Browser", spaceID: "5", title: "cristiandjr/tabby", frame: .zero, windowID: 99)]
+        #expect(MissionControlAccessibility.match(windows: windows, thumbnails: thumbnails).isEmpty)
+    }
+
+    @Test func doesNotGuessWithinTheSameAppWithoutTitleOrID() {
+        let windows = [window(1, "com.brave.Browser", nil)]
+        let thumbnails = [thumbnail("com.brave.Browser", "Other")]
+        #expect(MissionControlAccessibility.match(windows: windows, thumbnails: thumbnails).isEmpty)
     }
 
     @Test func neverMatchesAcrossApps() {

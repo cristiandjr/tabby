@@ -36,6 +36,8 @@ public final class SessionController {
     private var renderedFrame: CGRect?
     private var highlightShown = false
     private var openedAt: ContinuousClock.Instant?
+    private var liveFrames: [CGWindowID: CGRect] = [:]
+    private var realSizes: [CGWindowID: CGSize] = [:]
     private var mouseMonitor: Any?
     private var mouseAnchor: NSPoint?
     private var mouseTookOver = false
@@ -98,6 +100,10 @@ public final class SessionController {
         guard !snapshot.isEmpty else { return }
         windows = Dictionary(snapshot.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         engine = NavigationEngine(windowIDs: snapshot.map(\.id))
+        realSizes = snapshot.reduce(into: [:]) { result, window in
+            result[window.id] = provider.element(for: window.id).flatMap { AX.size($0, kAXSizeAttribute) }
+        }
+        liveFrames = CGWindowSource.bounds(for: snapshot.map(\.id))
         activating = false
         renderedFrame = nil
         highlightShown = false
@@ -154,7 +160,10 @@ public final class SessionController {
                 try? await Task.sleep(for: .milliseconds(tick < 15 ? 60 : 150))
                 tick += 1
                 guard let self, self.engine != nil, !self.activating else { return }
-                self.resolveThumbnails()
+                self.liveFrames = CGWindowSource.bounds(for: Array(self.windows.keys))
+                if tick % 4 == 0 || self.thumbnails.count < self.windows.count {
+                    self.resolveThumbnails()
+                }
                 if self.selectedFrame() != self.renderedFrame || (!self.highlightShown && self.openingAnimationFinished && !self.mouseTookOver) {
                     self.render()
                 }
@@ -163,7 +172,7 @@ public final class SessionController {
     }
 
     private func selectedFrame() -> CGRect? {
-        engine?.selectedID.flatMap { thumbnails[$0]?.info.frame }
+        engine?.selectedID.flatMap { liveFrames[$0] }
     }
 
     private var openingAnimationFinished: Bool {
@@ -181,6 +190,8 @@ public final class SessionController {
         engine = nil
         windows = [:]
         thumbnails = [:]
+        liveFrames = [:]
+        realSizes = [:]
         if wasActive {
             onEvent?(.closed)
         }
@@ -198,10 +209,10 @@ public final class SessionController {
         guard let engine, let id = engine.selectedID, let window = windows[id] else { return }
         let position = (engine.selectedIndex ?? 0) + 1
         let title = window.title.map { " — \($0)" } ?? ""
-        let frame = thumbnails[id]?.info.frame
+        let frame = liveFrames[id]
         renderedFrame = frame
         if let frame, openingAnimationFinished, !mouseTookOver {
-            let scale = frame.width / max(window.frame.width, 1)
+            let scale = frame.width / max(realSizes[id]?.width ?? frame.width, 1)
             overlay.showHighlight(globalRect: frame, cornerRadius: min(max(20 * scale, 8), 44))
             highlightShown = true
         } else {

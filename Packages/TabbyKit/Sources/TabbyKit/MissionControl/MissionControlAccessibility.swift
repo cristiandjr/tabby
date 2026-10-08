@@ -6,21 +6,24 @@ public struct ThumbnailInfo: Equatable, Sendable {
     public let spaceID: String?
     public let title: String?
     public let frame: CGRect
+    public let windowID: CGWindowID?
 
-    public init(bundleID: String?, spaceID: String?, title: String?, frame: CGRect) {
+    public init(bundleID: String?, spaceID: String?, title: String?, frame: CGRect, windowID: CGWindowID? = nil) {
         self.bundleID = bundleID
         self.spaceID = spaceID
         self.title = title
         self.frame = frame
+        self.windowID = windowID
     }
 
-    public init?(identifier: String?, title: String?, frame: CGRect?) {
+    public init?(identifier: String?, title: String?, frame: CGRect?, windowID: CGWindowID? = nil) {
         guard let identifier, let frame, let range = identifier.range(of: ".space.", options: .backwards) else { return nil }
         self.init(
             bundleID: String(identifier[..<range.lowerBound]),
             spaceID: String(identifier[range.upperBound...]),
             title: title,
-            frame: frame
+            frame: frame,
+            windowID: windowID
         )
     }
 }
@@ -33,6 +36,7 @@ public struct MissionControlThumbnail {
 public enum MissionControlAccessibility {
     public static let windowManagerBundleID = "com.apple.WindowManager"
     public static let displayIdentifier = "mc.display"
+    static let windowIDAttribute = "wid"
 
     @MainActor
     public static var windowManagerPID: pid_t? {
@@ -65,7 +69,8 @@ public enum MissionControlAccessibility {
                 ThumbnailInfo(
                     identifier: AX.string(element, "AXIdentifier"),
                     title: AX.string(element, kAXTitleAttribute) ?? AX.string(element, kAXDescriptionAttribute),
-                    frame: AX.frame(element)
+                    frame: AX.frame(element),
+                    windowID: (AX.raw(element, windowIDAttribute) as? NSNumber)?.uint32Value
                 ).map { MissionControlThumbnail(element: element, info: $0) }
             }
         }
@@ -82,30 +87,24 @@ public enum MissionControlAccessibility {
         var result: [CGWindowID: Int] = [:]
         var used = Set<Int>()
         for window in windows {
-            guard let title = window.title, !title.isEmpty else { continue }
-            if let index = thumbnails.indices.first(where: {
-                !used.contains($0) && thumbnails[$0].bundleID == window.bundleID && thumbnails[$0].title == title
-            }) {
+            if let index = thumbnails.indices.first(where: { !used.contains($0) && thumbnails[$0].windowID == window.id }) {
                 result[window.id] = index
                 used.insert(index)
             }
         }
         for window in windows where result[window.id] == nil {
-            let aspect = window.frame.width / max(window.frame.height, 1)
-            let candidates = thumbnails.indices.filter { !used.contains($0) && thumbnails[$0].bundleID == window.bundleID }
-            let best = candidates.min { first, second in
-                abs(aspectRatio(thumbnails[first].frame) - aspect) < abs(aspectRatio(thumbnails[second].frame) - aspect)
-            }
-            if let best {
-                result[window.id] = best
-                used.insert(best)
+            guard let title = window.title, !title.isEmpty else { continue }
+            if let index = thumbnails.indices.first(where: {
+                !used.contains($0)
+                    && thumbnails[$0].windowID == nil
+                    && thumbnails[$0].bundleID == window.bundleID
+                    && thumbnails[$0].title == title
+            }) {
+                result[window.id] = index
+                used.insert(index)
             }
         }
         return result
-    }
-
-    private static func aspectRatio(_ frame: CGRect) -> CGFloat {
-        frame.width / max(frame.height, 1)
     }
 
     @MainActor

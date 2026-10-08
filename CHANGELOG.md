@@ -12,7 +12,7 @@ First preview build.
 
 - Menu bar app that works on top of macOS Mission Control.
 - <kbd>Tab</kbd> / <kbd>⇧</kbd><kbd>Tab</kbd> move through the windows of the current display, most recent first. <kbd>Return</kbd> goes to the selected window, and <kbd>Esc</kbd> closes Mission Control as usual.
-- A highlight drawn on the selected Mission Control thumbnail, plus a bar with the window name.
+- A highlight drawn on the selected Mission Control thumbnail, plus a bar with the window name. It follows the exact size and position of each thumbnail, however many windows are open.
 - Works however you open Mission Control: keyboard shortcut, F3, trackpad gesture or hot corner.
 - Moving the mouse hands the selection back to Mission Control's own hover highlight.
 - Pause toggle and Launch at Login in the menu.
