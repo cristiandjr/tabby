@@ -26,7 +26,7 @@ struct OnboardingView: View {
                 }
                 Spacer()
                 if step != .welcome {
-                    Button(localized("Back", "Atrás")) { move(by: -1) }
+                    Button("Back") { move(by: -1) }
                 }
                 Button(primaryTitle) { step == .done ? finish() : move(by: 1) }
                     .keyboardShortcut(.defaultAction)
@@ -44,27 +44,24 @@ struct OnboardingView: View {
         case .welcome:
             VStack(spacing: 14) {
                 BrandLogo(height: 110)
-                Text(localized("Welcome to Tabby", "Bienvenido a Tabby")).font(.title2.bold())
-                Text(localized("Navigate Mission Control without touching your mouse.", "Navegá Mission Control sin tocar el mouse."))
+                Text("Welcome to Tabby").font(.title2.bold())
+                Text("Navigate Mission Control without touching your mouse.")
                     .foregroundStyle(.secondary)
                 shortcutList.padding(.top, 6)
             }
         case .accessibility:
             page(
                 image: Image(systemName: "hand.raised.circle.fill"),
-                title: localized("Accessibility permission", "Permiso de Accesibilidad"),
-                text: localized(
-                    "Tabby needs it to detect Mission Control, read your windows and focus the one you choose. It only listens to the keyboard while Mission Control is open.",
-                    "Tabby lo necesita para detectar Mission Control, leer tus ventanas y enfocar la que elijas. Solo escucha el teclado mientras Mission Control está abierto."
-                )
+                title: "Accessibility permission",
+                text: "Tabby needs it to detect Mission Control, read your windows and focus the one you choose. It only listens to the keyboard while Mission Control is open."
             ) {
                 if model.hasAccessibility {
-                    status(localized("Permission granted", "Permiso concedido"))
+                    status("Permission granted")
                 } else {
-                    Button(localized("Open System Settings", "Abrir Configuración del Sistema")) {
+                    Button("Open System Settings") {
                         model.requestAccessibility()
                     }
-                    Text(localized("Turn on Tabby in the list. This page updates by itself.", "Activá Tabby en la lista. Esta pantalla se actualiza sola."))
+                    Text("Turn on Tabby in the list. This page updates by itself.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -72,23 +69,20 @@ struct OnboardingView: View {
         case .test:
             page(
                 image: Image(systemName: "rectangle.3.group.fill"),
-                title: localized("Try it", "Probalo"),
-                text: localized(
-                    "Open Mission Control the way you usually do: its shortcut, F3, the trackpad gesture or a hot corner.",
-                    "Abrí Mission Control como siempre: con su atajo, F3, el gesto o una esquina activa."
-                )
+                title: "Try it",
+                text: "Open Mission Control the way you usually do: its shortcut, F3, the trackpad gesture or a hot corner."
             ) {
                 if !model.hasAccessibility {
-                    Text(localized("First grant the Accessibility permission.", "Primero dale el permiso de Accesibilidad."))
+                    Text("First grant the Accessibility permission.")
                         .foregroundStyle(.orange)
                 } else if model.missionControlDetections > detectionsAtStart {
-                    status(localized("Detected! Press Tab to choose and Return to go there.", "¡Detectado! Tocá Tab para elegir y Enter para ir a esa ventana."))
+                    status("Detected! Press Tab to choose and Return to go there.")
                 } else {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text(localized("Waiting for Mission Control…", "Esperando Mission Control…")).foregroundStyle(.secondary)
+                        Text("Waiting for Mission Control…").foregroundStyle(.secondary)
                     }
-                    Button(localized("Open Mission Control", "Abrir Mission Control")) {
+                    Button("Open Mission Control") {
                         model.openMissionControl()
                     }
                 }
@@ -96,19 +90,16 @@ struct OnboardingView: View {
         case .lift:
             page(
                 image: Image(systemName: "sparkles.rectangle.stack.fill"),
-                title: localized("Lift the selected window", "Agrandar la ventana seleccionada"),
-                text: localized(
-                    "Optional. The selected window grows a little so you always see where you are. It needs Screen Recording: Tabby keeps the images in memory only while Mission Control is open.",
-                    "Opcional. La ventana elegida crece un poco para que siempre veas dónde estás. Necesita Grabación de pantalla: Tabby guarda las imágenes en memoria solo mientras Mission Control está abierto."
-                )
+                title: "Lift the selected window",
+                text: "Optional. The selected window grows a little so you always see where you are. It needs Screen Recording: Tabby keeps the images in memory only while Mission Control is open."
             ) {
-                Toggle(localized("Lift the selected window", "Agrandar la ventana seleccionada"), isOn: $model.liftsSelection)
+                Toggle("Lift the selected window", isOn: $model.liftsSelection)
                     .toggleStyle(.switch)
                 if model.liftsSelection {
                     if model.hasScreenRecording {
-                        status(localized("Screen Recording allowed", "Grabación de pantalla permitida"))
+                        status("Screen Recording allowed")
                     } else {
-                        Button(localized("Allow Screen Recording…", "Permitir Grabación de pantalla…")) {
+                        Button("Allow Screen Recording…") {
                             model.requestScreenRecording()
                         }
                     }
@@ -117,22 +108,19 @@ struct OnboardingView: View {
         case .done:
             page(
                 image: Image(systemName: "checkmark.circle.fill"),
-                title: localized("All set", "¡Listo!"),
-                text: localized("Tabby lives in the menu bar. Change everything in Settings (⌘,).", "Tabby vive en la barra de menús. Cambiá todo en Configuración (⌘,).")
+                title: "All set",
+                text: "Tabby lives in the menu bar. Change everything in Settings (⌘,)."
             ) {
                 shortcutList
-                Toggle(localized("Launch at login", "Abrir al iniciar sesión"), isOn: $model.launchesAtLogin)
+                Toggle("Launch at login", isOn: $model.launchesAtLogin)
                     .toggleStyle(.switch)
                     .disabled(model.isTranslocated)
                 if model.isTranslocated {
-                    Text(localized(
-                        "To launch at login, move Tabby to Applications and open it again.",
-                        "Para abrir al iniciar sesión, mové Tabby a Aplicaciones y abrila de nuevo."
-                    ))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    Text("To launch at login, move Tabby to Applications and open it again.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
-                Text(localized("Made with ❤️ in Argentina 🇦🇷", "Hecho con ❤️ en Argentina 🇦🇷"))
+                Text("Made with ❤️ in Argentina 🇦🇷")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)
@@ -142,18 +130,18 @@ struct OnboardingView: View {
 
     private var shortcutList: some View {
         Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
-            row(KeyLabels.describe(model.shortcuts.next), localized("next window", "siguiente ventana"))
-            row(KeyLabels.describe(model.shortcuts.previous), localized("previous window", "ventana anterior"))
-            row(KeyLabels.describe(model.shortcuts.activate), localized("go to the window", "ir a la ventana"))
-            row("\(model.shortcuts.moveModifiers.symbols)1…9", localized("move it to that desktop", "moverla a ese escritorio"))
+            row(KeyLabels.describe(model.shortcuts.next), "next window")
+            row(KeyLabels.describe(model.shortcuts.previous), "previous window")
+            row(KeyLabels.describe(model.shortcuts.activate), "go to the window")
+            row("\(model.shortcuts.moveModifiers.symbols)1…9", "move it to that desktop")
         }
     }
 
     private var primaryTitle: String {
         switch step {
-        case .welcome: localized("Get Started", "Empezar")
-        case .done: localized("Finish", "Terminar")
-        default: localized("Continue", "Continuar")
+        case .welcome: "Get Started"
+        case .done: "Finish"
+        default: "Continue"
         }
     }
 

@@ -210,16 +210,13 @@ public final class SessionController {
     private static func notice(for failure: SpaceMoveFailure, window: MissionWindow, desktop number: Int) -> String {
         switch failure {
         case .onAllDesktops:
-            localized(
-                "\(window.appName) is on all desktops. Change it in the Dock: Options → Assign To → None",
-                "\(window.appName) está en todos los escritorios. Cambialo en el Dock: Opciones → Asignar a → Ninguno"
-            )
+            "\(window.appName) is on all desktops. Change it in the Dock: Options → Assign To → None"
         case .invalidDesktop:
-            localized("macOS allows up to \(SpaceMover.maximumDesktops) desktops", "macOS permite hasta \(SpaceMover.maximumDesktops) escritorios")
+            "macOS allows up to \(SpaceMover.maximumDesktops) desktops"
         case .desktopNotCreated:
-            localized("Couldn't create Desktop \(number)", "No se pudo crear el Escritorio \(number)")
+            "Couldn't create Desktop \(number)"
         case .noThumbnail, .noSpacesBar, .dropRejected:
-            localized("Couldn't move the window to Desktop \(number)", "No se pudo mover la ventana al Escritorio \(number)")
+            "Couldn't move the window to Desktop \(number)"
         }
     }
 

@@ -2,17 +2,26 @@ import AppKit
 import SwiftUI
 import TabbyKit
 
+enum SettingsTab: Hashable {
+    case general
+    case shortcuts
+    case about
+}
+
 struct SettingsView: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        TabView {
+        TabView(selection: $model.settingsTab) {
             GeneralSettings(model: model)
-                .tabItem { Label(localized("General", "General"), systemImage: "gearshape") }
+                .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsTab.general)
             ShortcutsSettings(model: model)
-                .tabItem { Label(localized("Shortcuts", "Atajos"), systemImage: "keyboard") }
+                .tabItem { Label("Shortcuts", systemImage: "keyboard") }
+                .tag(SettingsTab.shortcuts)
             AboutView(version: model.version)
-                .tabItem { Label(localized("About", "Acerca de"), systemImage: "info.circle") }
+                .tabItem { Label("About", systemImage: "info.circle") }
+                .tag(SettingsTab.about)
         }
         .frame(width: 520)
     }
@@ -24,40 +33,34 @@ private struct GeneralSettings: View {
     var body: some View {
         Form {
             Section {
-                Toggle(localized("Enabled", "Activado"), isOn: $model.isEnabled)
-                Toggle(localized("Launch at login", "Abrir al iniciar sesión"), isOn: $model.launchesAtLogin)
+                Toggle("Enabled", isOn: $model.isEnabled)
+                Toggle("Launch at login", isOn: $model.launchesAtLogin)
                     .disabled(model.isTranslocated)
             } footer: {
                 if model.isTranslocated {
-                    Text(localized(
-                        "To launch at login, move Tabby to Applications and open it again.",
-                        "Para abrir al iniciar sesión, mové Tabby a Aplicaciones y abrila de nuevo."
-                    ))
-                    .foregroundStyle(.secondary)
+                    Text("To launch at login, move Tabby to Applications and open it again.")
+                        .foregroundStyle(.secondary)
                 }
             }
             Section {
-                Button(localized("Show the welcome tour", "Ver la bienvenida")) {
+                Button("Show the welcome tour") {
                     model.showOnboarding()
                 }
             }
             Section {
-                Toggle(localized("Lift the selected window", "Agrandar la ventana seleccionada"), isOn: $model.liftsSelection)
+                Toggle("Lift the selected window", isOn: $model.liftsSelection)
                 PermissionRow(
-                    title: localized("Screen Recording", "Grabación de pantalla"),
+                    title: "Screen Recording",
                     granted: model.hasScreenRecording,
                     action: model.requestScreenRecording
                 )
             } footer: {
-                Text(localized(
-                    "Optional. Tabby captures the windows of the current display only while Mission Control is open, keeps them in memory and drops them when it closes.",
-                    "Opcional. Tabby captura las ventanas de la pantalla actual solo mientras Mission Control está abierto, las guarda en memoria y las descarta al cerrarlo."
-                ))
-                .foregroundStyle(.secondary)
+                Text("Optional. Tabby captures the windows of the current display only while Mission Control is open, keeps them in memory and drops them when it closes.")
+                    .foregroundStyle(.secondary)
             }
-            Section(localized("Required", "Obligatorio")) {
+            Section("Required") {
                 PermissionRow(
-                    title: localized("Accessibility", "Accesibilidad"),
+                    title: "Accessibility",
                     granted: model.hasAccessibility,
                     action: model.openAccessibilitySettings
                 )
@@ -73,36 +76,33 @@ private struct ShortcutsSettings: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent(localized("Next window", "Siguiente ventana")) {
+                LabeledContent("Next window") {
                     ShortcutRecorder(combo: binding(\.next))
                 }
-                LabeledContent(localized("Previous window", "Ventana anterior")) {
+                LabeledContent("Previous window") {
                     ShortcutRecorder(combo: binding(\.previous))
                 }
-                LabeledContent(localized("Go to window", "Ir a la ventana")) {
+                LabeledContent("Go to window") {
                     ShortcutRecorder(combo: binding(\.activate))
                 }
-                Picker(localized("Move to desktop", "Mover a escritorio"), selection: moveModifiers) {
+                Picker("Move to desktop", selection: moveModifiers) {
                     ForEach(ShortcutSettings.moveModifierChoices, id: \.rawValue) { modifiers in
                         Text("\(modifiers.symbols) 1…9").tag(modifiers)
                     }
                 }
             } header: {
-                Text(localized("Inside Mission Control", "Dentro de Mission Control"))
+                Text("Inside Mission Control")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(messages.enumerated()), id: \.offset) { _, message in
                         Text(message.text).foregroundStyle(message.isError ? .red : .orange)
                     }
-                    Text(localized(
-                        "Shortcuts only work while Mission Control is open. If the desktop doesn't exist, Tabby creates it.",
-                        "Los atajos solo funcionan con Mission Control abierto. Si el escritorio no existe, Tabby lo crea."
-                    ))
-                    .foregroundStyle(.secondary)
+                    Text("Shortcuts only work while Mission Control is open. If the desktop doesn't exist, Tabby creates it.")
+                        .foregroundStyle(.secondary)
                 }
             }
             Section {
-                Button(localized("Restore default shortcuts", "Restablecer atajos")) {
+                Button("Restore default shortcuts") {
                     model.resetShortcuts()
                 }
             }
@@ -125,17 +125,14 @@ private struct ShortcutsSettings: View {
     }
 
     private static func describe(_ issue: ShortcutSettings.Issue, rejected: Bool) -> String {
-        let prefix = rejected ? localized("Not saved: ", "No se guardó: ") : ""
+        let prefix = rejected ? "Not saved: " : ""
         switch issue {
         case .duplicate(let combo):
-            return prefix + localized("\(KeyLabels.describe(combo)) is already used by another action", "\(KeyLabels.describe(combo)) ya lo usa otra acción")
+            return prefix + "\(KeyLabels.describe(combo)) is already used by another action"
         case .clashesWithMove(let combo):
-            return prefix + localized("\(KeyLabels.describe(combo)) already moves windows to a desktop", "\(KeyLabels.describe(combo)) ya mueve ventanas a un escritorio")
+            return prefix + "\(KeyLabels.describe(combo)) already moves windows to a desktop"
         case .systemShortcut(let combo):
-            return localized(
-                "\(KeyLabels.describe(combo)) switches desktops in macOS; inside Mission Control Tabby will use it instead",
-                "\(KeyLabels.describe(combo)) cambia de escritorio en macOS; dentro de Mission Control lo va a usar Tabby"
-            )
+            return "\(KeyLabels.describe(combo)) switches desktops in macOS; inside Mission Control Tabby will use it instead"
         }
     }
 }
@@ -148,10 +145,10 @@ private struct PermissionRow: View {
     var body: some View {
         LabeledContent(title) {
             if granted {
-                Label(localized("Allowed", "Permitido"), systemImage: "checkmark.circle.fill")
+                Label("Allowed", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             } else {
-                Button(localized("Allow…", "Permitir…"), action: action)
+                Button("Allow…", action: action)
             }
         }
     }

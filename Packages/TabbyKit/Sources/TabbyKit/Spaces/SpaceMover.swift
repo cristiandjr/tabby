@@ -31,6 +31,10 @@ public struct SpacesBar: Equatable, Sendable {
     public var isExpanded: Bool {
         desktopCenters.allSatisfy { $0.y > displayFrame.minY }
     }
+
+    public static func isDesktop(actions: [String], description: String?) -> Bool {
+        actions.contains("AXRemoveDesktop") || !(description?.localizedCaseInsensitiveContains("full screen") ?? false)
+    }
 }
 
 public enum PointerEvent: Equatable, Sendable {

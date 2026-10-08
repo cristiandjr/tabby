@@ -34,6 +34,12 @@ struct SpaceMoverTests {
         #expect(system.events.isEmpty)
     }
 
+    @Test func fullScreenAppsDoNotCountAsDesktops() {
+        #expect(SpacesBar.isDesktop(actions: ["AXPress", "AXRemoveDesktop"], description: "exit to Escritorio 2"))
+        #expect(!SpacesBar.isDesktop(actions: ["AXPress"], description: "exit to full screen Safari"))
+        #expect(SpacesBar.isDesktop(actions: ["AXPress"], description: "exit to Escritorio"))
+    }
+
     @Test func refusesWindowsThatAreOnAllDesktops() async {
         system.onAllDesktops = true
         let result = await mover.move(window, toDesktop: 3)

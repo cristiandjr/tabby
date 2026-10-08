@@ -145,7 +145,7 @@ Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima
 | 🎯 **La ventana exacta** | Enfoca la ventana que elegiste, aunque haya varias de la misma app. |
 | ✨ **Sabes dónde estás** | La ventana seleccionada se levanta un poco con un resorte suave y vuelve a su lugar al pasar a otra. |
 | 🗂️ **Mándala a un escritorio** | <kbd>⌘</kbd><kbd>1</kbd>…<kbd>⌘</kbd><kbd>9</kbd> mueve la ventana seleccionada a ese escritorio y, si todavía no existe, lo crea. |
-| ⚙️ **Tus atajos** | Cambia cualquier atajo en Configuración. |
+| ⚙️ **Tus atajos** | Cambia cualquier atajo en **Settings**. |
 | 🪄 **Como sea que lo abras** | Atajo, F3, gesto o esquina activa: Tabby no depende de ninguno. |
 | 🍎 **Nativa** | Swift, SwiftUI y AppKit. Una app mínima en la barra de menús que no estorba. |
 | 🔒 **Privada** | Sin red, sin analíticas y sin cuentas. Solo escucha el teclado mientras Mission Control está abierto. |
@@ -196,7 +196,7 @@ open build/Tabby.app
 | `TabbyApp` | La app de barra de menús, empaquetada por `scripts/build-app.sh`. |
 | `tabby-probe` | Herramienta de diagnóstico guiada que comprueba qué permite tu versión de macOS. Ver [docs/spikes](docs/spikes/README.md). |
 
-Las ideas, los issues y los pull requests son bienvenidos. Si algo no funciona, abre **Diagnóstico…** en el menú, copia el reporte y pégalo en el issue.
+Las ideas, los issues y los pull requests son bienvenidos. Si algo no funciona, abre **Diagnostics…** en el menú, copia el reporte y pégalo en el issue.
 
 ### Apoya a Tabby
 

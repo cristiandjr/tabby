@@ -8,30 +8,33 @@ struct MenuContent: View {
     var body: some View {
         Text(model.status)
         if !model.hasAccessibility {
-            Button(localized("Grant Accessibility Permission…", "Dar permiso de Accesibilidad…")) {
+            Button("Grant Accessibility Permission…") {
                 model.openAccessibilitySettings()
             }
         } else if model.liftsSelection && !model.hasScreenRecording {
-            Button(localized("Allow Screen Recording to Lift Windows…", "Permitir Grabación de pantalla para agrandar…")) {
+            Button("Allow Screen Recording to Lift Windows…") {
                 model.requestScreenRecording()
             }
         }
         Divider()
-        Toggle(localized("Enabled", "Activado"), isOn: $model.isEnabled)
-        Button(localized("Settings…", "Configuración…")) {
+        Toggle("Enabled", isOn: $model.isEnabled)
+        Button("Settings…") {
             model.showSettings(using: openSettings)
         }
         .keyboardShortcut(",")
-        Button(localized("Diagnostics…", "Diagnóstico…")) {
+        Button("Diagnostics…") {
             model.showDiagnostics()
         }
         Divider()
-        Button(localized("Open Mission Control", "Abrir Mission Control")) {
+        Button("Open Mission Control") {
             model.openMissionControl()
         }
         Divider()
-        Text(localized("Version \(model.version)", "Versión \(model.version)"))
-        Button(localized("Quit Tabby", "Salir de Tabby")) {
+        Button("About Tabby") {
+            model.showSettings(using: openSettings, tab: .about)
+        }
+        Divider()
+        Button("Quit Tabby") {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")

@@ -24,6 +24,7 @@ final class AppModel {
     private(set) var hasAccessibility = AX.isTrusted
     private(set) var hasScreenRecording = OverlayPresenter.canCaptureWindows
     private(set) var missionControlDetections = 0
+    var settingsTab = SettingsTab.general
 
     let isTranslocated = Bundle.main.bundlePath.contains("/AppTranslocation/")
 
@@ -35,6 +36,7 @@ final class AppModel {
     @ObservationIgnored private let onboarding = HostedWindow()
     @ObservationIgnored private let diagnostics = HostedWindow()
     @ObservationIgnored private var lastSession: DiagnosticsReport.Session?
+    @ObservationIgnored private var windowObserver: NSObjectProtocol?
     @ObservationIgnored private let presenter = OverlayPresenter()
     @ObservationIgnored private let controller: SessionController
     @ObservationIgnored private let log = Log.logger("app")
@@ -47,6 +49,12 @@ final class AppModel {
         controller.setKeymap(shortcuts.keymap)
         controller.onEvent = { [weak self] event in
             self?.record(event)
+        }
+        windowObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { [weak self] notification in
+            let closing = (notification.object as AnyObject?).map(ObjectIdentifier.init)
+            MainActor.assumeIsolated {
+                self?.hideFromDockIfNoWindows(closing: closing)
+            }
         }
         let needsOnboarding = !UserDefaults.standard.bool(forKey: Self.onboardingKey)
         if hasAccessibility {
@@ -65,6 +73,7 @@ final class AppModel {
     }
 
     func showOnboarding() {
+        showInDock()
         onboarding.show(title: "Tabby", transparentTitleBar: true, onClose: { [weak self] in
             UserDefaults.standard.set(true, forKey: Self.onboardingKey)
             self?.hasAccessibility = AX.isTrusted
@@ -74,7 +83,8 @@ final class AppModel {
     }
 
     func showDiagnostics() {
-        diagnostics.show(title: localized("Tabby Diagnostics", "Diagnóstico de Tabby")) {
+        showInDock()
+        diagnostics.show(title: "Tabby Diagnostics") {
             DiagnosticsView(model: self)
         }
     }
@@ -121,6 +131,24 @@ final class AppModel {
         )
     }
 
+    private func showInDock() {
+        if NSApplication.shared.activationPolicy() != .regular {
+            NSApplication.shared.setActivationPolicy(.regular)
+        }
+    }
+
+    private func hideFromDockIfNoWindows(closing: ObjectIdentifier?) {
+        Task { @MainActor in
+            await Task.yield()
+            let open = NSApplication.shared.windows.contains { window in
+                ObjectIdentifier(window) != closing && window.isVisible && !(window is NSPanel) && window.styleMask.contains(.titled)
+            }
+            if !open {
+                NSApplication.shared.setActivationPolicy(.accessory)
+            }
+        }
+    }
+
     private static var architecture: String {
         #if arch(arm64)
         "Apple Silicon"
@@ -141,11 +169,11 @@ final class AppModel {
 
     var status: String {
         guard hasAccessibility else {
-            return localized("Waiting for Accessibility permission", "Esperando el permiso de Accesibilidad")
+            return "Waiting for Accessibility permission"
         }
         return isEnabled
-            ? localized("Tabby is active", "Tabby está activo")
-            : localized("Tabby is paused", "Tabby está en pausa")
+            ? "Tabby is active"
+            : "Tabby is paused"
     }
 
     func openAccessibilitySettings() {
@@ -172,9 +200,13 @@ final class AppModel {
         updateShortcuts { $0 = .standard }
     }
 
-    func showSettings(using openSettings: OpenSettingsAction) {
+    func showSettings(using openSettings: OpenSettingsAction, tab: SettingsTab? = nil) {
+        if let tab {
+            settingsTab = tab
+        }
         hasScreenRecording = OverlayPresenter.canCaptureWindows
         hasAccessibility = AX.isTrusted
+        showInDock()
         NSApplication.shared.activate()
         openSettings()
         Task { @MainActor in

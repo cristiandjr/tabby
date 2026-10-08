@@ -9,7 +9,7 @@ struct ShortcutRecorder: View {
 
     var body: some View {
         Button(action: toggle) {
-            Text(recording ? localized("Press keys…", "Presioná las teclas…") : KeyLabels.describe(combo))
+            Text(recording ? "Press keys…" : KeyLabels.describe(combo))
                 .frame(minWidth: 120)
         }
         .buttonStyle(.bordered)

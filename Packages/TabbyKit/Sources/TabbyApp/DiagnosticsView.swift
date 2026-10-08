@@ -11,10 +11,10 @@ struct DiagnosticsView: View {
         VStack(alignment: .leading, spacing: 14) {
             if let report {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
-                    check(localized("Accessibility", "Accesibilidad"), report.accessibility)
-                    check(localized("Keyboard (only while Mission Control is open)", "Teclado (solo con Mission Control abierto)"), report.keyboardTap)
-                    check(localized("Screen Recording (optional)", "Grabación de pantalla (opcional)"), report.screenRecording)
-                    check(localized("Secure Input off", "Entrada segura desactivada"), !report.secureInput)
+                    check("Accessibility", report.accessibility)
+                    check("Keyboard (only while Mission Control is open)", report.keyboardTap)
+                    check("Screen Recording (optional)", report.screenRecording)
+                    check("Secure Input off", !report.secureInput)
                 }
                 ScrollView {
                     Text(report.text)
@@ -24,22 +24,19 @@ struct DiagnosticsView: View {
                         .padding(10)
                 }
                 .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-                Text(localized(
-                    "The report has no window titles, keystrokes or personal data. Paste it in a GitHub issue.",
-                    "El reporte no tiene títulos de ventanas, teclas ni datos personales. Pegalo en un issue de GitHub."
-                ))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                Text("The report has no window titles, keystrokes or personal data. Paste it in a GitHub issue.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
             HStack {
-                Button(localized("Open Mission Control", "Abrir Mission Control")) {
+                Button("Open Mission Control") {
                     model.openMissionControl()
                 }
-                Button(localized("Refresh", "Actualizar")) {
+                Button("Refresh") {
                     refresh()
                 }
                 Spacer()
-                Button(copied ? localized("Copied ✓", "Copiado ✓") : localized("Copy Report", "Copiar reporte")) {
+                Button(copied ? "Copied ✓" : "Copy Report") {
                     refresh()
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(report?.text ?? "", forType: .string)

@@ -31,7 +31,9 @@ public final class LiveSpaceSystem: SpaceSystem {
               let list = descendant(of: display, identifier: Self.listIdentifier)
         else { return nil }
         // WindowManager reports each desktop's center as the origin of its frame.
-        let centers = AX.elements(list, kAXChildrenAttribute).compactMap { AX.frame($0)?.origin }
+        let centers = AX.elements(list, kAXChildrenAttribute)
+            .filter { SpacesBar.isDesktop(actions: AX.actions($0), description: AX.string($0, kAXDescriptionAttribute)) }
+            .compactMap { AX.frame($0)?.origin }
         return SpacesBar(displayFrame: displayFrame, desktopCenters: centers)
     }
 
