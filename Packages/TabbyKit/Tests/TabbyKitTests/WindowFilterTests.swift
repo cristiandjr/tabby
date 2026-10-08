@@ -10,8 +10,10 @@ struct WindowFilterTests {
     }
 
     @Test func keepsNormalWindowsInOrder() {
-        let records = [record(id: 1), record(id: 2)]
-        #expect(WindowFilter.candidates(records).map(\.id) == [1, 2])
+        let records: [CGWindowRecord] = [record(id: 1), record(id: 2)]
+        let ids: [CGWindowID] = WindowFilter.candidates(records).map(\.id)
+        let expected: [CGWindowID] = [1, 2]
+        #expect(ids == expected)
     }
 
     @Test func dropsWindowsOutsideTheNormalLayer() {
@@ -27,8 +29,10 @@ struct WindowFilterTests {
     }
 
     @Test func dropsExcludedProcesses() {
-        let records = [record(id: 1, pid: 7), record(id: 2, pid: 8)]
-        #expect(WindowFilter.candidates(records, excluding: [7]).map(\.id) == [2])
+        let records: [CGWindowRecord] = [record(id: 1, pid: 7), record(id: 2, pid: 8)]
+        let ids: [CGWindowID] = WindowFilter.candidates(records, excluding: [7]).map(\.id)
+        let expected: [CGWindowID] = [2]
+        #expect(ids == expected)
     }
 
     @Test func parsesWindowServerDictionaries() {

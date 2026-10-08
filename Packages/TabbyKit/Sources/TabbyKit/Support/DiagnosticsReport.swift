@@ -88,30 +88,76 @@ public struct DiagnosticsReport: Equatable, Sendable {
     }
 
     public var text: String {
-        var lines = [
-            "Tabby \(appVersion) (\(build))",
-            "macOS \(macOS) · \(architecture)",
-            "Displays: " + (displays.isEmpty ? "none" : displays.map { "\($0.width)×\($0.height) @\(Self.format($0.scale))x" }.joined(separator: ", ")),
-            "",
-            "Accessibility: \(Self.yes(accessibility)) · Screen Recording: \(Self.yes(screenRecording)) · Post events: \(Self.yes(postEvents)) · Input Monitoring: \(Self.yes(listenEvents))",
-            "Secure Input: \(secureInput ? "on" : "off") · _AXUIElementGetWindow: \(privateWindowAPI ? "available" : "missing")",
-            "Tabby: \(enabled ? "enabled" : "paused") · running: \(Self.yes(running)) · keyboard tap: \(keyboardTap ? "installed" : "not installed") · tap timeouts: \(tapTimeouts)",
-            "Shortcuts: " + shortcuts.joined(separator: " · "),
-            "Lift effect: \(liftSetting ? "on" : "off") · active: \(Self.yes(liftSetting && screenRecording && !reduceMotion)) · reduce motion: \(Self.yes(reduceMotion))",
-            "Translocated: \(Self.yes(translocated)) · Launch at login: \(launchAtLogin)",
-            "Update check: \(updateCheck ? "on" : "off") · new version: \(availableUpdate ?? "none")",
-            "Capability level: " + (capabilityLevel.map { "\($0) (\(Self.levelName($0)))" } ?? "unknown, open Mission Control once"),
-        ]
+        var lines: [String] = []
+        lines.append("Tabby \(appVersion) (\(build))")
+        lines.append("macOS \(macOS) · \(architecture)")
+        lines.append("Displays: \(displayList)")
+        lines.append("")
+        lines.append(permissionsLine)
+        lines.append(systemLine)
+        lines.append(stateLine)
+        lines.append("Shortcuts: \(shortcuts.joined(separator: " · "))")
+        lines.append(liftLine)
+        lines.append("Translocated: \(Self.yes(translocated)) · Launch at login: \(launchAtLogin)")
+        lines.append("Update check: \(Self.onOff(updateCheck)) · new version: \(availableUpdate ?? "none")")
+        lines.append("Capability level: \(capabilityDescription)")
         if let lastSession {
             lines.append("Last session: \(lastSession.windows) windows · \(lastSession.thumbnails) thumbnails matched")
             if let activation = lastSession.activation {
-                lines.append("Last activation: \(activation.exact ? "exact" : "not exact") · \(activation.strategy.rawValue) · \(Int(activation.elapsed / .milliseconds(1))) ms")
+                let exactness: String = activation.exact ? "exact" : "not exact"
+                let milliseconds: Int = Int(activation.elapsed / .milliseconds(1))
+                lines.append("Last activation: \(exactness) · \(activation.strategy.rawValue) · \(milliseconds) ms")
             }
             if let move = lastSession.move {
                 lines.append("Last move: \(String(describing: move))")
             }
         }
         return lines.joined(separator: "\n")
+    }
+
+    private var displayList: String {
+        guard !displays.isEmpty else { return "none" }
+        let names: [String] = displays.map { display in
+            "\(display.width)×\(display.height) @\(Self.format(display.scale))x"
+        }
+        return names.joined(separator: ", ")
+    }
+
+    private var permissionsLine: String {
+        let accessibilityText: String = Self.yes(accessibility)
+        let recordingText: String = Self.yes(screenRecording)
+        let postText: String = Self.yes(postEvents)
+        let listenText: String = Self.yes(listenEvents)
+        return "Accessibility: \(accessibilityText) · Screen Recording: \(recordingText) · Post events: \(postText) · Input Monitoring: \(listenText)"
+    }
+
+    private var systemLine: String {
+        let secureText: String = Self.onOff(secureInput)
+        let apiText: String = privateWindowAPI ? "available" : "missing"
+        return "Secure Input: \(secureText) · _AXUIElementGetWindow: \(apiText)"
+    }
+
+    private var stateLine: String {
+        let enabledText: String = enabled ? "enabled" : "paused"
+        let runningText: String = Self.yes(running)
+        let tapText: String = keyboardTap ? "installed" : "not installed"
+        return "Tabby: \(enabledText) · running: \(runningText) · keyboard tap: \(tapText) · tap timeouts: \(tapTimeouts)"
+    }
+
+    private var liftLine: String {
+        let settingText: String = Self.onOff(liftSetting)
+        let activeText: String = Self.yes(liftSetting && screenRecording && !reduceMotion)
+        let motionText: String = Self.yes(reduceMotion)
+        return "Lift effect: \(settingText) · active: \(activeText) · reduce motion: \(motionText)"
+    }
+
+    private var capabilityDescription: String {
+        guard let level = capabilityLevel else { return "unknown, open Mission Control once" }
+        return "\(level) (\(Self.levelName(level)))"
+    }
+
+    private static func onOff(_ value: Bool) -> String {
+        value ? "on" : "off"
     }
 
     private static func yes(_ value: Bool) -> String {
