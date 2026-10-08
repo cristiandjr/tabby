@@ -90,7 +90,7 @@ final class AutoRunner {
         guard preflight() else { return 2 }
         AX.setGlobalTimeout(0.3)
         startNotifications()
-        interceptor.onKey = { [weak self] key in
+        interceptor.onAction = { [weak self] key in
             self?.handleKey(key)
         }
         guard interceptor.install() else {
@@ -360,7 +360,7 @@ final class AutoRunner {
         overlay.showHUD(text: "\(window.appName)  ·  \(position)/\(engine.windowIDs.count)", near: frame ?? window.frame)
     }
 
-    private func handleKey(_ key: NavigationKey) {
+    private func handleKey(_ key: SessionAction) {
         guard engine != nil else { return }
         switch key {
         case .next:
@@ -370,7 +370,7 @@ final class AutoRunner {
         case .previous:
             engine?.previous()
             render()
-        case .select:
+        case .activate:
             returnReceived = true
             activate()
         }

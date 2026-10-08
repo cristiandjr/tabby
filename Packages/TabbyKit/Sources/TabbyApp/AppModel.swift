@@ -14,15 +14,25 @@ final class AppModel {
         didSet { applyLaunchAtLogin() }
     }
 
+    var liftsSelection = UserDefaults.standard.object(forKey: AppModel.liftsSelectionKey) as? Bool ?? true {
+        didSet { applyLiftsSelection() }
+    }
+
     private(set) var hasAccessibility = AX.isTrusted
+    private(set) var hasScreenRecording = OverlayPresenter.canCaptureWindows
 
     @ObservationIgnored let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
 
-    @ObservationIgnored private let controller = SessionController()
+    @ObservationIgnored private static let liftsSelectionKey = "liftsSelection"
+    @ObservationIgnored private let presenter = OverlayPresenter()
+    @ObservationIgnored private let controller: SessionController
     @ObservationIgnored private let log = Log.logger("app")
     @ObservationIgnored private var permissionTask: Task<Void, Never>?
+    @ObservationIgnored private var screenRecordingTask: Task<Void, Never>?
 
     init() {
+        controller = SessionController(dependencies: .live(presenter: presenter))
+        presenter.liftsSelection = liftsSelection
         controller.onEvent = { [weak self] event in
             self?.record(event)
         }
@@ -48,6 +58,22 @@ final class AppModel {
         NSWorkspace.shared.open(url)
     }
 
+    func requestScreenRecording() {
+        if !CGRequestScreenCaptureAccess(),
+           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
+        }
+        screenRecordingTask?.cancel()
+        screenRecordingTask = Task { @MainActor [weak self] in
+            for _ in 0..<120 {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self else { return }
+                self.hasScreenRecording = OverlayPresenter.canCaptureWindows
+                if self.hasScreenRecording { return }
+            }
+        }
+    }
+
     func openMissionControl() {
         NSWorkspace.shared.openApplication(
             at: URL(fileURLWithPath: "/System/Applications/Mission Control.app"),
@@ -62,6 +88,11 @@ final class AppModel {
         } else {
             controller.stop()
         }
+    }
+
+    private func applyLiftsSelection() {
+        UserDefaults.standard.set(liftsSelection, forKey: Self.liftsSelectionKey)
+        presenter.liftsSelection = liftsSelection
     }
 
     private func applyLaunchAtLogin() {
@@ -100,9 +131,10 @@ final class AppModel {
     private func record(_ event: SessionController.Event) {
         switch event {
         case .opened(let windows):
+            hasScreenRecording = OverlayPresenter.canCaptureWindows
             log.info("mission control opened with \(windows) windows")
-        case .activated(_, let exact, let strategy, let elapsed):
-            log.info("activated exact=\(exact) strategy=\(strategy.rawValue, privacy: .public) in \(Int(elapsed / .milliseconds(1)))ms")
+        case .activated(_, let result):
+            log.info("activated exact=\(result.exact) strategy=\(result.strategy.rawValue, privacy: .public) in \(Int(result.elapsed / .milliseconds(1)))ms")
         case .selected, .closed:
             break
         }

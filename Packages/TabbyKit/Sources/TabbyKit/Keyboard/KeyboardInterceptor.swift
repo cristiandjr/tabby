@@ -1,12 +1,6 @@
 import CoreGraphics
 import Foundation
 
-public enum NavigationKey: String, Codable, Sendable {
-    case next
-    case previous
-    case select
-}
-
 public final class KeyboardInterceptor: @unchecked Sendable {
     public enum Mode: Sendable {
         case off
@@ -14,34 +8,13 @@ public final class KeyboardInterceptor: @unchecked Sendable {
         case intercept
     }
 
-    public struct Bindings: Sendable {
-        public var next: [KeyCombo]
-        public var previous: [KeyCombo]
-        public var select: [KeyCombo]
-
-        public init(next: [KeyCombo], previous: [KeyCombo], select: [KeyCombo]) {
-            self.next = next
-            self.previous = previous
-            self.select = select
-        }
-
-        public static let standard = Bindings(next: [.next], previous: [.previous], select: [.select, .selectKeypad])
-
-        public func key(for keyCode: UInt16, flags: CGEventFlags) -> NavigationKey? {
-            if next.contains(where: { $0.matches(keyCode: keyCode, flags: flags) }) { return .next }
-            if previous.contains(where: { $0.matches(keyCode: keyCode, flags: flags) }) { return .previous }
-            if select.contains(where: { $0.matches(keyCode: keyCode, flags: flags) }) { return .select }
-            return nil
-        }
-    }
-
-    public typealias KeyHandler = @MainActor @Sendable (NavigationKey) -> Void
+    public typealias ActionHandler = @MainActor @Sendable (SessionAction) -> Void
     public typealias KeyDownHandler = @MainActor @Sendable (UInt16, ModifierSet, ContinuousClock.Instant) -> Void
 
     private let lock = NSLock()
     private var currentMode: Mode = .off
-    private var currentBindings: Bindings
-    private var keyHandler: KeyHandler?
+    private var currentKeymap: Keymap
+    private var actionHandler: ActionHandler?
     private var keyDownHandler: KeyDownHandler?
     private var swallowed: Set<UInt16> = []
     private var drainGeneration = 0
@@ -49,8 +22,8 @@ public final class KeyboardInterceptor: @unchecked Sendable {
     private var tap: CFMachPort?
     private var runLoop: CFRunLoop?
 
-    public init(bindings: Bindings = .standard) {
-        currentBindings = bindings
+    public init(keymap: Keymap = .standard) {
+        currentKeymap = keymap
     }
 
     public var mode: Mode {
@@ -65,14 +38,14 @@ public final class KeyboardInterceptor: @unchecked Sendable {
         locked { timeouts }
     }
 
-    public var bindings: Bindings {
-        get { locked { currentBindings } }
-        set { locked { currentBindings = newValue } }
+    public var keymap: Keymap {
+        get { locked { currentKeymap } }
+        set { locked { currentKeymap = newValue } }
     }
 
-    public var onKey: KeyHandler? {
-        get { locked { keyHandler } }
-        set { locked { keyHandler = newValue } }
+    public var onAction: ActionHandler? {
+        get { locked { actionHandler } }
+        set { locked { actionHandler = newValue } }
     }
 
     public var onKeyDown: KeyDownHandler? {
@@ -179,12 +152,12 @@ public final class KeyboardInterceptor: @unchecked Sendable {
             let flags = event.flags
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             let now = ContinuousClock().now
-            let (keyDown, handler, key) = locked { () -> (KeyDownHandler?, KeyHandler?, NavigationKey?) in
-                guard currentMode == .intercept, let key = currentBindings.key(for: keyCode, flags: flags) else {
+            let (keyDown, handler, action) = locked { () -> (KeyDownHandler?, ActionHandler?, SessionAction?) in
+                guard currentMode == .intercept, let action = currentKeymap.action(forKeyCode: keyCode, flags: flags) else {
                     return (keyDownHandler, nil, nil)
                 }
                 swallowed.insert(keyCode)
-                return (keyDownHandler, keyHandler, key)
+                return (keyDownHandler, actionHandler, action)
             }
             if let keyDown {
                 let modifiers = ModifierSet(flags)
@@ -192,10 +165,10 @@ public final class KeyboardInterceptor: @unchecked Sendable {
                     keyDown(keyCode, modifiers, now)
                 }
             }
-            guard let key else { return false }
-            if let handler, !(isRepeat && key == .select) {
+            guard let action else { return false }
+            if let handler, !isRepeat || action.repeatsWhenHeld {
                 Task { @MainActor in
-                    handler(key)
+                    handler(action)
                 }
             }
             return true

@@ -175,7 +175,7 @@ final class ProbeRunner {
         if let pid = DockAccessibility.pid {
             report.dockNotificationRegistration = dockSniffer.start(pid: pid, notifications: Self.dockNotifications)
         }
-        interceptor.onKey = { [weak self] key in
+        interceptor.onAction = { [weak self] key in
             self?.handleKey(key)
         }
         interceptor.onKeyDown = { [weak self] code, modifiers, instant in
@@ -661,9 +661,9 @@ final class ProbeRunner {
         overlay.showHUD(text: "\(window.appName)\(title)  ·  \(position)/\(engine.windowIDs.count)", near: thumbnailFrame ?? window.frame)
     }
 
-    private func handleKey(_ key: NavigationKey) {
+    private func handleKey(_ key: SessionAction) {
         guard phase == .demo, engine != nil else { return }
-        sessionKeys[key.rawValue, default: 0] += 1
+        sessionKeys[String(describing: key), default: 0] += 1
         switch key {
         case .next:
             engine?.next()
@@ -671,7 +671,7 @@ final class ProbeRunner {
         case .previous:
             engine?.previous()
             render()
-        case .select:
+        case .activate:
             activateSelection()
         }
     }

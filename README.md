@@ -48,6 +48,7 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 |---|---|
 | ⌨️ **Keyboard first** | Tab, ⇧Tab and Return inside Mission Control, most recent window first. |
 | 🎯 **The exact window** | Focuses the window you picked, even when several windows belong to the same app. |
+| ✨ **See where you are** | The selected window lifts slightly with a soft spring and settles back when you move on. |
 | 🪄 **However you open it** | Shortcut, F3, trackpad gesture or hot corner: Tabby doesn't depend on any of them. |
 | 🍎 **Native** | Swift, SwiftUI and AppKit. A tiny menu bar app that stays out of your way. |
 | 🔒 **Private** | No network, no analytics, no accounts. It only listens to the keyboard while Mission Control is open. |
@@ -55,8 +56,8 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 
 ### Roadmap
 
-- [ ] **Spike 0:** validate the macOS capabilities Tabby relies on *(in progress)*
-- [ ] **v0.1:** menu bar app with Tab, ⇧Tab and Return
+- [x] **Spike 0:** validate the macOS capabilities Tabby relies on
+- [ ] **v0.1:** menu bar app with Tab, ⇧Tab and Return *(in progress)*
 - [ ] Arrow-key navigation based on the thumbnails' positions
 - [ ] Move the selected window to another desktop with a shortcut
 - [ ] Number shortcuts (1–9) and window search
@@ -77,6 +78,7 @@ macOS requires Accessibility permission for apps that detect Mission Control, re
 - It only listens to the keyboard while Mission Control is open.
 - It never records or sends what you type.
 - It has no network access, no analytics and no accounts.
+- **Screen Recording is optional** and only powers the lift effect. Tabby captures the windows of the current display while Mission Control is open, keeps the images in memory and drops them when it closes. Nothing is saved or sent. Without it, Tabby works the same with a plain highlight.
 - The code is open, so you can check all of the above.
 
 ### Requirements
@@ -132,6 +134,7 @@ Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima
 |---|---|
 | ⌨️ **Primero el teclado** | Tab, ⇧Tab y Enter dentro de Mission Control, empezando por la ventana más reciente. |
 | 🎯 **La ventana exacta** | Enfoca la ventana que elegiste, aunque haya varias de la misma app. |
+| ✨ **Sabes dónde estás** | La ventana seleccionada se levanta un poco con un resorte suave y vuelve a su lugar al pasar a otra. |
 | 🪄 **Como sea que lo abras** | Atajo, F3, gesto o esquina activa: Tabby no depende de ninguno. |
 | 🍎 **Nativa** | Swift, SwiftUI y AppKit. Una app mínima en la barra de menús que no estorba. |
 | 🔒 **Privada** | Sin red, sin analíticas y sin cuentas. Solo escucha el teclado mientras Mission Control está abierto. |
@@ -139,8 +142,8 @@ Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima
 
 ### Hoja de ruta
 
-- [ ] **Spike 0:** validar las capacidades de macOS que necesita Tabby *(en curso)*
-- [ ] **v0.1:** app de barra de menús con Tab, ⇧Tab y Enter
+- [x] **Spike 0:** validar las capacidades de macOS que necesita Tabby
+- [ ] **v0.1:** app de barra de menús con Tab, ⇧Tab y Enter *(en curso)*
 - [ ] Navegación con flechas según la posición de las miniaturas
 - [ ] Mover la ventana seleccionada a otro escritorio con un atajo
 - [ ] Atajos numéricos (1–9) y búsqueda de ventanas
@@ -161,6 +164,7 @@ macOS exige el permiso de Accesibilidad a las apps que detectan Mission Control,
 - Solo escucha el teclado mientras Mission Control está abierto.
 - Nunca guarda ni envía lo que escribes.
 - No tiene acceso a la red, ni analíticas, ni cuentas.
+- **Grabación de pantalla es opcional** y solo se usa para el efecto de agrandar. Tabby captura las ventanas de la pantalla actual mientras Mission Control está abierto, guarda las imágenes en memoria y las descarta al cerrarlo. No se guarda ni se envía nada. Sin ese permiso, Tabby funciona igual con un recuadro simple.
 - El código es abierto: puedes comprobar todo lo anterior.
 
 ### Requisitos

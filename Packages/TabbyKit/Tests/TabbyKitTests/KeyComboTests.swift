@@ -32,13 +32,24 @@ struct KeyComboTests {
         #expect(try JSONDecoder().decode(KeyCombo.self, from: data) == combo)
     }
 
-    @Test func standardBindingsResolveNavigationKeys() {
-        let bindings = KeyboardInterceptor.Bindings.standard
-        #expect(bindings.key(for: KeyCode.tab, flags: []) == .next)
-        #expect(bindings.key(for: KeyCode.tab, flags: .maskShift) == .previous)
-        #expect(bindings.key(for: KeyCode.returnKey, flags: []) == .select)
-        #expect(bindings.key(for: KeyCode.keypadEnter, flags: .maskNumericPad) == .select)
-        #expect(bindings.key(for: KeyCode.escape, flags: []) == nil)
-        #expect(bindings.key(for: KeyCode.tab, flags: .maskCommand) == nil)
+    @Test func standardKeymapResolvesSessionActions() {
+        let keymap = Keymap.standard
+        #expect(keymap.action(forKeyCode: KeyCode.tab, flags: []) == .next)
+        #expect(keymap.action(forKeyCode: KeyCode.tab, flags: .maskShift) == .previous)
+        #expect(keymap.action(forKeyCode: KeyCode.returnKey, flags: []) == .activate)
+        #expect(keymap.action(forKeyCode: KeyCode.keypadEnter, flags: .maskNumericPad) == .activate)
+        #expect(keymap.action(forKeyCode: KeyCode.escape, flags: []) == nil)
+        #expect(keymap.action(forKeyCode: KeyCode.tab, flags: .maskCommand) == nil)
+    }
+
+    @Test func onlyNavigationRepeatsWhenHeld() {
+        #expect(SessionAction.next.repeatsWhenHeld)
+        #expect(SessionAction.previous.repeatsWhenHeld)
+        #expect(!SessionAction.activate.repeatsWhenHeld)
+    }
+
+    @Test func keymapRoundTripsThroughJSON() throws {
+        let data = try JSONEncoder().encode(Keymap.standard)
+        #expect(try JSONDecoder().decode(Keymap.self, from: data) == .standard)
     }
 }

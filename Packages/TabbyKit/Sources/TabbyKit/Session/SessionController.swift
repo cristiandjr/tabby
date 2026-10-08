@@ -1,66 +1,61 @@
 import AppKit
-import ApplicationServices
 
 @MainActor
 public final class SessionController {
-    public enum Event: Sendable {
+    public enum Event {
         case opened(windows: Int)
         case selected(MissionWindow)
-        case activated(MissionWindow, exact: Bool, strategy: ActivationStrategy, elapsed: Duration)
+        case activated(MissionWindow, ActivationResult)
         case closed
     }
 
     public var onEvent: (@MainActor (Event) -> Void)?
     public private(set) var isRunning = false
+    public private(set) var state: SessionState = .idle
 
     public var isSessionActive: Bool {
-        engine != nil
+        state.session != nil
     }
 
     public var matchedThumbnails: Int {
-        thumbnails.count
+        state.session?.thumbnails.count ?? 0
     }
 
     public var selectedHasThumbnail: Bool {
-        engine?.selectedID.map { thumbnails[$0] != nil } ?? false
+        guard let session = state.session, let id = session.engine.selectedID else { return false }
+        return session.thumbnails[id] != nil
     }
 
-    private let interceptor = KeyboardInterceptor()
-    private let provider = WindowProvider()
-    private let overlay = SelectionOverlay()
-    private let monitor = MissionControlMonitor()
+    private let dependencies: SessionDependencies
+    private var detector = MissionControlDetector()
+    private var tracker = HighlightTracker()
+    private var presented: SelectionPresentation?
+    private var refreshTick = 0
     private var pollTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
-    private var missionControlOpen = false
-    private var closedReadings = 0
-    private var renderedFrame: CGRect?
-    private var highlightShown = false
-    private var openedAt: ContinuousClock.Instant?
-    private var liveFrames: [CGWindowID: CGRect] = [:]
-    private var realSizes: [CGWindowID: CGSize] = [:]
-    private var mouseMonitor: Any?
-    private var mouseAnchor: NSPoint?
-    private var mouseTookOver = false
-    private var engine: NavigationEngine?
-    private var windows: [CGWindowID: MissionWindow] = [:]
-    private var thumbnails: [CGWindowID: MissionControlThumbnail] = [:]
-    private var activating = false
 
-    public init() {}
+    public convenience init() {
+        self.init(dependencies: .live())
+    }
+
+    public init(dependencies: SessionDependencies) {
+        self.dependencies = dependencies
+    }
 
     @discardableResult
     public func start(pollInterval: Duration = .milliseconds(100)) -> Bool {
         guard !isRunning else { return true }
         guard AX.isTrusted else { return false }
         AX.setGlobalTimeout(0.3)
-        interceptor.onKey = { [weak self] key in
-            self?.handle(key)
+        dependencies.keyboard.onAction = { [weak self] action in
+            self?.perform(action)
         }
-        guard interceptor.install() else { return false }
-        pollTask = Task { @MainActor [weak self] in
+        guard dependencies.keyboard.install() else { return false }
+        let clock = dependencies.clock
+        pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: pollInterval, tolerance: pollInterval / 4)
-                guard let self else { return }
+                await clock.sleep(for: pollInterval, tolerance: pollInterval / 4)
+                guard let self, !Task.isCancelled else { return }
                 self.poll()
             }
         }
@@ -71,233 +66,134 @@ public final class SessionController {
     public func stop() {
         pollTask?.cancel()
         pollTask = nil
-        endSession()
-        interceptor.uninstall()
+        finishSession()
+        detector.reset()
+        dependencies.keyboard.uninstall()
         isRunning = false
     }
 
-    private func poll() {
-        guard let open = monitor.isOpen() else { return }
-        if open {
-            closedReadings = 0
-            guard !missionControlOpen else { return }
-            missionControlOpen = true
+    func poll() {
+        switch detector.feed(dependencies.monitor.isOpen()) {
+        case .opened:
             beginSession()
-        } else {
-            guard missionControlOpen else { return }
-            closedReadings += 1
-            guard closedReadings >= 2 else { return }
-            closedReadings = 0
-            missionControlOpen = false
-            endSession()
+        case .closed:
+            finishSession()
+        case nil:
+            break
         }
+    }
+
+    func perform(_ action: SessionAction) {
+        guard case .navigating(var session) = state else { return }
+        switch action {
+        case .next, .previous:
+            session.move(action)
+            state = .navigating(session)
+            tracker.reclaim(pointer: dependencies.pointer.location)
+            render()
+            if let window = session.selected {
+                onEvent?(.selected(window))
+            }
+        case .activate:
+            activate(session)
+        }
+    }
+
+    func refresh() {
+        guard case .navigating(var session) = state else { return }
+        refreshTick += 1
+        tracker.update(liveFrames: dependencies.windows.liveFrames(of: session.engine.windowIDs))
+        if refreshTick % 4 == 0 || session.thumbnails.count < session.windows.count {
+            session.thumbnails = dependencies.thumbnails.thumbnails(for: Array(session.windows.values))
+            state = .navigating(session)
+        }
+        render()
+    }
+
+    func pointerMoved(to location: CGPoint) {
+        guard state.isNavigating, tracker.pointerMoved(to: location) else { return }
+        render()
     }
 
     private func beginSession() {
-        let allWindows = provider.snapshot()
-        let display = allWindows.first?.displayID ?? Self.displayUnderMouse()
-        let snapshot = allWindows.filter { $0.displayID == display }
-        guard !snapshot.isEmpty else { return }
-        windows = Dictionary(snapshot.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        engine = NavigationEngine(windowIDs: snapshot.map(\.id))
-        realSizes = snapshot.reduce(into: [:]) { result, window in
-            result[window.id] = provider.element(for: window.id).flatMap { AX.size($0, kAXSizeAttribute) }
-        }
-        liveFrames = CGWindowSource.bounds(for: snapshot.map(\.id))
-        activating = false
-        renderedFrame = nil
-        highlightShown = false
-        openedAt = ContinuousClock().now
-        mouseTookOver = false
-        mouseAnchor = NSEvent.mouseLocation
-        resolveThumbnails()
-        interceptor.setMode(.intercept)
+        guard state.session == nil else { return }
+        let all = dependencies.windows.snapshot()
+        guard let display = all.first?.displayID else { return }
+        let windows = all.filter { $0.displayID == display }
+        var session = NavigationSession(windows: windows)
+        session.thumbnails = dependencies.thumbnails.thumbnails(for: windows)
+        let ids = windows.map(\.id)
+        tracker.begin(
+            realSizes: ids.reduce(into: [:]) { result, id in result[id] = dependencies.windows.realSize(of: id) },
+            liveFrames: dependencies.windows.liveFrames(of: ids),
+            openedAt: dependencies.clock.now,
+            pointer: dependencies.pointer.location,
+            skipsOpeningDelay: dependencies.reducesMotion()
+        )
+        presented = nil
+        refreshTick = 0
+        state = .navigating(session)
+        dependencies.keyboard.setMode(.intercept)
+        dependencies.presenter.prepare(for: windows)
         render()
-        onEvent?(.opened(windows: snapshot.count))
+        onEvent?(.opened(windows: windows.count))
         startRefreshing()
-        startWatchingMouse()
-    }
-
-    private static func displayUnderMouse() -> CGDirectDisplayID {
-        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        let location = NSEvent.mouseLocation
-        var display: CGDirectDisplayID = 0
-        var count: UInt32 = 0
-        CGGetDisplaysWithPoint(CGPoint(x: location.x, y: primaryHeight - location.y), 1, &display, &count)
-        return count > 0 ? display : CGMainDisplayID()
-    }
-
-    private func startWatchingMouse() {
-        stopWatchingMouse()
-        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.mouseMoved()
-            }
+        dependencies.pointer.start { [weak self] location in
+            self?.pointerMoved(to: location)
         }
     }
 
-    private func stopWatchingMouse() {
-        if let mouseMonitor {
-            NSEvent.removeMonitor(mouseMonitor)
-        }
-        mouseMonitor = nil
-    }
-
-    private func mouseMoved() {
-        guard engine != nil, !mouseTookOver, let mouseAnchor else { return }
-        let location = NSEvent.mouseLocation
-        guard hypot(location.x - mouseAnchor.x, location.y - mouseAnchor.y) > 8 else { return }
-        mouseTookOver = true
-        overlay.showHighlight(globalRect: nil)
-        highlightShown = false
-    }
-
-    private func startRefreshing() {
-        refreshTask?.cancel()
-        refreshTask = Task { @MainActor [weak self] in
-            var tick = 0
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(tick < 15 ? 60 : 150))
-                tick += 1
-                guard let self, self.engine != nil, !self.activating else { return }
-                self.liveFrames = CGWindowSource.bounds(for: Array(self.windows.keys))
-                if tick % 4 == 0 || self.thumbnails.count < self.windows.count {
-                    self.resolveThumbnails()
-                }
-                if self.selectedFrame() != self.renderedFrame || (!self.highlightShown && self.openingAnimationFinished && !self.mouseTookOver) {
-                    self.render()
-                }
-            }
-        }
-    }
-
-    private func selectedFrame() -> CGRect? {
-        engine?.selectedID.flatMap { liveFrames[$0] }
-    }
-
-    private var openingAnimationFinished: Bool {
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion, let openedAt else { return true }
-        return ContinuousClock().now - openedAt >= .milliseconds(320)
-    }
-
-    private func endSession() {
-        let wasActive = engine != nil
-        refreshTask?.cancel()
-        refreshTask = nil
-        stopWatchingMouse()
-        interceptor.setMode(.off)
-        overlay.hide()
-        engine = nil
-        windows = [:]
-        thumbnails = [:]
-        liveFrames = [:]
-        realSizes = [:]
+    private func finishSession() {
+        let wasActive = state.session != nil
+        stopSessionWork()
+        tracker.reset()
+        state = .idle
         if wasActive {
             onEvent?(.closed)
         }
     }
 
-    private func resolveThumbnails() {
-        let found = MissionControlAccessibility.thumbnails()
-        let matches = MissionControlAccessibility.match(windows: Array(windows.values), thumbnails: found.map(\.info))
-        thumbnails = matches.reduce(into: [:]) { result, item in
-            result[item.key] = found[item.value]
+    private func activate(_ session: NavigationSession) {
+        guard let window = session.selected else { return }
+        state = .activating(session, target: window.id)
+        stopSessionWork()
+        let thumbnail = session.thumbnails[window.id]
+        let activator = dependencies.activator
+        Task { [weak self] in
+            let result = await activator.activate(window, thumbnail: thumbnail)
+            self?.onEvent?(.activated(window, result))
+        }
+    }
+
+    private func stopSessionWork() {
+        refreshTask?.cancel()
+        refreshTask = nil
+        dependencies.pointer.stop()
+        dependencies.keyboard.setMode(.off)
+        dependencies.presenter.dismiss()
+        presented = nil
+    }
+
+    private func startRefreshing() {
+        refreshTask?.cancel()
+        let clock = dependencies.clock
+        refreshTask = Task { [weak self] in
+            var tick = 0
+            while !Task.isCancelled {
+                await clock.sleep(for: .milliseconds(tick < 15 ? 60 : 150))
+                tick += 1
+                guard let self, !Task.isCancelled else { return }
+                self.refresh()
+            }
         }
     }
 
     private func render() {
-        guard let engine, let id = engine.selectedID, let window = windows[id] else { return }
-        let position = (engine.selectedIndex ?? 0) + 1
-        let title = window.title.map { " — \($0)" } ?? ""
-        let frame = liveFrames[id]
-        renderedFrame = frame
-        if let frame, openingAnimationFinished, !mouseTookOver {
-            let scale = frame.width / max(realSizes[id]?.width ?? frame.width, 1)
-            overlay.showHighlight(globalRect: frame, cornerRadius: min(max(20 * scale, 8), 44))
-            highlightShown = true
-        } else {
-            overlay.showHighlight(globalRect: nil)
-            highlightShown = false
-        }
-        overlay.showHUD(text: "\(window.appName)\(title)  ·  \(position)/\(engine.windowIDs.count)", near: frame ?? window.frame)
-    }
-
-    private func handle(_ key: NavigationKey) {
-        guard engine != nil, !activating else { return }
-        switch key {
-        case .next:
-            engine?.next()
-            reclaimFromMouse()
-            render()
-            notifySelection()
-        case .previous:
-            engine?.previous()
-            reclaimFromMouse()
-            render()
-            notifySelection()
-        case .select:
-            activate()
-        }
-    }
-
-    private func reclaimFromMouse() {
-        mouseTookOver = false
-        mouseAnchor = NSEvent.mouseLocation
-    }
-
-    private func notifySelection() {
-        guard let id = engine?.selectedID, let window = windows[id] else { return }
-        onEvent?(.selected(window))
-    }
-
-    private func activate() {
-        guard let engine, let id = engine.selectedID, let window = windows[id] else { return }
-        activating = true
-        interceptor.setMode(.off)
-        overlay.hide()
-        let element = provider.element(for: id)
-        let thumbnail = thumbnails[id]
-        Task { @MainActor [weak self] in
-            let clock = ContinuousClock()
-            let started = clock.now
-            var strategy: ActivationStrategy = thumbnail == nil ? .accessibility : .dockThumbnail
-            if let thumbnail {
-                WindowActivator.pressThumbnail(thumbnail.element)
-                await Self.waitUntilMissionControlCloses(timeout: .milliseconds(300))
-            }
-            if Self.missionControlIsOpen {
-                strategy = .accessibility
-                WindowActivator.postKey(KeyCode.escape)
-                await Self.waitUntilMissionControlCloses(timeout: .milliseconds(500))
-            }
-            let exact = await Self.focus(id, pid: window.pid, element: element, timeout: .milliseconds(700))
-            self?.onEvent?(.activated(window, exact: exact, strategy: strategy, elapsed: clock.now - started))
-        }
-    }
-
-    private static var missionControlIsOpen: Bool {
-        DockAccessibility.isMissionControlOpen(DockAccessibility.topLevelSignature())
-    }
-
-    private static func waitUntilMissionControlCloses(timeout: Duration) async {
-        let deadline = ContinuousClock().now + timeout
-        while missionControlIsOpen, ContinuousClock().now < deadline {
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-    }
-
-    private static func focus(_ id: CGWindowID, pid: pid_t, element: AXUIElement?, timeout: Duration) async -> Bool {
-        let clock = ContinuousClock()
-        let deadline = clock.now + timeout
-        var nextAttempt = clock.now
-        while !WindowActivator.isFocused(id, pid: pid) {
-            guard clock.now < deadline else { return false }
-            if let element, clock.now >= nextAttempt {
-                _ = WindowActivator.activateWithAccessibility(pid: pid, window: element)
-                nextAttempt = clock.now + .milliseconds(80)
-            }
-            try? await Task.sleep(for: .milliseconds(15))
-        }
-        return true
+        guard case .navigating(let session) = state,
+              let presentation = tracker.presentation(for: session, now: dependencies.clock.now),
+              presentation != presented
+        else { return }
+        presented = presentation
+        dependencies.presenter.present(presentation)
     }
 }
