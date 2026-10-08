@@ -6,63 +6,39 @@ public final class SelectionOverlay {
     private static let hudSize = NSSize(width: 640, height: 56)
     private static let ringGap: CGFloat = 3
     private static let ringWidth: CGFloat = 4
+    private static let liftAllowance: CGFloat = 0.08
+    private static let shadowAllowance: CGFloat = 40
 
     private final class Card {
         let id: CGWindowID
-        let screenIndex: Int
+        let panel: NSPanel
         let container = CALayer()
         let image = CALayer()
         let ring = CAShapeLayer()
         var hasImage = false
         var lift: CGFloat = 1
 
-        init(id: CGWindowID, screenIndex: Int) {
+        init(id: CGWindowID, panel: NSPanel) {
             self.id = id
-            self.screenIndex = screenIndex
+            self.panel = panel
         }
     }
 
-    private var panels: [NSPanel] = []
     private var current: Card?
-    private let hudPanel: NSPanel
-    private let hudLabel: NSTextField
+    private var retiring: [Card] = []
+    private var hudPanel: NSPanel?
+    private var hudLabel: NSTextField?
 
-    public init() {
-        let size = Self.hudSize
-        let panel = Self.makePanel(frame: NSRect(origin: .zero, size: size))
-        let background = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
-        background.material = .hudWindow
-        background.blendingMode = .behindWindow
-        background.state = .active
-        background.wantsLayer = true
-        background.layer?.cornerRadius = 16
-        background.layer?.masksToBounds = true
-        let label = NSTextField(labelWithString: "")
-        label.font = .systemFont(ofSize: 15, weight: .medium)
-        label.textColor = .white
-        label.alignment = .center
-        label.lineBreakMode = .byTruncatingMiddle
-        label.frame = NSRect(x: 18, y: 17, width: size.width - 36, height: 22)
-        background.addSubview(label)
-        panel.contentView = background
-        hudPanel = panel
-        hudLabel = label
-    }
+    public init() {}
 
     public func showSelection(id: CGWindowID, globalRect: CGRect, cornerRadius: CGFloat, image: CGImage?, lift: CGFloat, animated: Bool) {
-        rebuildPanelsIfNeeded()
         let target = appKitRect(fromGlobal: globalRect)
-        let screens = NSScreen.screens
-        guard let index = screens.indices.max(by: { overlap(screens[$0].frame, target) < overlap(screens[$1].frame, target) }),
-              index < panels.count,
-              overlap(screens[index].frame, target) > 0
-        else {
+        guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(target) }) else {
             hideSelection(animated: false)
             return
         }
-        let local = target.offsetBy(dx: -screens[index].frame.minX, dy: -screens[index].frame.minY)
-        if let card = current, card.id == id, card.screenIndex == index {
-            layout(card, in: local, cornerRadius: cornerRadius)
+        if let card = current, card.id == id {
+            place(card, at: target, cornerRadius: cornerRadius)
             if let image, !card.hasImage {
                 setImage(image, on: card)
             }
@@ -72,10 +48,9 @@ public final class SelectionOverlay {
             return
         }
         retire(current, animated: animated)
-        let card = makeCard(id: id, screenIndex: index, scale: screens[index].backingScaleFactor)
-        layout(card, in: local, cornerRadius: cornerRadius)
-        panels[index].contentView?.layer?.addSublayer(card.container)
-        panels[index].orderFrontRegardless()
+        let card = makeCard(id: id, scale: screen.backingScaleFactor)
+        place(card, at: target, cornerRadius: cornerRadius)
+        card.panel.orderFrontRegardless()
         current = card
         if let image {
             setImage(image, on: card)
@@ -104,43 +79,71 @@ public final class SelectionOverlay {
             NSScreen.screens.first { $0.frame.intersects(appKitRect(fromGlobal: rect)) }
         } ?? NSScreen.main ?? NSScreen.screens.first
         guard let screen else { return }
+        let (panel, label) = hud()
         let size = Self.hudSize
         let frame = NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.minY + 90, width: size.width, height: size.height)
-        hudPanel.setFrame(frame, display: true)
-        hudLabel.stringValue = text
-        hudPanel.orderFrontRegardless()
+        panel.setFrame(frame, display: true)
+        label.stringValue = text
+        panel.orderFrontRegardless()
     }
 
     public func panelDiagnostics() -> [String] {
+        guard let card = current else { return ["no selection drawn"] }
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        return panels.enumerated().map { index, panel in
-            let screen = index < NSScreen.screens.count ? NSStringFromRect(NSScreen.screens[index].frame) : "?"
-            var drawn = "none"
-            if let card = current, card.screenIndex == index {
-                let size = card.container.bounds.size
-                let local = CGRect(x: card.container.position.x - size.width / 2, y: card.container.position.y - size.height / 2, width: size.width, height: size.height)
-                let global = ScreenGeometry.globalRect(fromAppKit: local.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY), primaryScreenHeight: primaryHeight)
-                drawn = "(\(Int(global.minX)),\(Int(global.minY)) \(Int(global.width))x\(Int(global.height)))"
-            }
-            return "screen \(screen) · panel \(NSStringFromRect(panel.frame)) · visible \(panel.isVisible) · drawn box in global coordinates \(drawn)"
-        }
+        let panel = card.panel
+        let size = card.container.bounds.size
+        let local = CGRect(x: card.container.position.x - size.width / 2, y: card.container.position.y - size.height / 2, width: size.width, height: size.height)
+        let global = ScreenGeometry.globalRect(fromAppKit: local.offsetBy(dx: panel.frame.minX, dy: panel.frame.minY), primaryScreenHeight: primaryHeight)
+        let drawn = "(\(Int(global.minX)),\(Int(global.minY)) \(Int(global.width))x\(Int(global.height)))"
+        return ["card panel \(NSStringFromRect(panel.frame)) · visible \(panel.isVisible) · drawn box in global coordinates \(drawn)"]
     }
 
     public var visibleWindowNumbers: [Int] {
-        ([hudPanel] + panels).filter(\.isVisible).map(\.windowNumber)
+        ([hudPanel, current?.panel] + retiring.map(\.panel)).compactMap { $0 }.filter(\.isVisible).map(\.windowNumber)
     }
 
     public func hide() {
+        current?.panel.orderOut(nil)
         current = nil
-        for panel in panels {
-            panel.contentView?.layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
-            panel.orderOut(nil)
-        }
-        hudPanel.orderOut(nil)
+        retiring.forEach { $0.panel.orderOut(nil) }
+        retiring = []
+        hudPanel?.orderOut(nil)
+        hudPanel = nil
+        hudLabel = nil
     }
 
-    private func makeCard(id: CGWindowID, screenIndex: Int, scale: CGFloat) -> Card {
-        let card = Card(id: id, screenIndex: screenIndex)
+    private func hud() -> (NSPanel, NSTextField) {
+        if let hudPanel, let hudLabel {
+            return (hudPanel, hudLabel)
+        }
+        let size = Self.hudSize
+        let panel = Self.makePanel(frame: NSRect(origin: .zero, size: size))
+        let background = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
+        background.material = .hudWindow
+        background.blendingMode = .behindWindow
+        background.state = .active
+        background.wantsLayer = true
+        background.layer?.cornerRadius = 16
+        background.layer?.masksToBounds = true
+        let label = NSTextField(labelWithString: "")
+        label.font = .systemFont(ofSize: 15, weight: .medium)
+        label.textColor = .white
+        label.alignment = .center
+        label.lineBreakMode = .byTruncatingMiddle
+        label.frame = NSRect(x: 18, y: 17, width: size.width - 36, height: 22)
+        background.addSubview(label)
+        panel.contentView = background
+        hudPanel = panel
+        hudLabel = label
+        return (panel, label)
+    }
+
+    private func makeCard(id: CGWindowID, scale: CGFloat) -> Card {
+        let panel = Self.makePanel(frame: NSRect(x: 0, y: 0, width: 10, height: 10))
+        let view = NSView(frame: NSRect(origin: .zero, size: panel.frame.size))
+        view.wantsLayer = true
+        panel.contentView = view
+        let card = Card(id: id, panel: panel)
         card.container.shadowColor = NSColor.black.cgColor
         card.container.shadowOpacity = 0
         card.container.shadowRadius = 22
@@ -158,15 +161,21 @@ public final class SelectionOverlay {
         card.ring.shadowOffset = .zero
         card.container.addSublayer(card.image)
         card.container.addSublayer(card.ring)
+        view.layer?.addSublayer(card.container)
         return card
     }
 
-    private func layout(_ card: Card, in local: CGRect, cornerRadius: CGFloat) {
+    private func place(_ card: Card, at target: CGRect, cornerRadius: CGFloat) {
+        let margin = max(target.width, target.height) * Self.liftAllowance / 2 + Self.ringGap + Self.ringWidth + Self.shadowAllowance
+        let frame = target.insetBy(dx: -margin, dy: -margin)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        let bounds = CGRect(origin: .zero, size: local.size)
+        if card.panel.frame != frame {
+            card.panel.setFrame(frame, display: false)
+        }
+        let bounds = CGRect(origin: .zero, size: target.size)
         card.container.bounds = bounds
-        card.container.position = CGPoint(x: local.midX, y: local.midY)
+        card.container.position = CGPoint(x: margin + target.width / 2, y: margin + target.height / 2)
         card.container.shadowPath = CGPath(roundedRect: bounds, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
         card.image.frame = bounds
         card.image.cornerRadius = cornerRadius
@@ -232,7 +241,7 @@ public final class SelectionOverlay {
     private func retire(_ card: Card?, animated: Bool) {
         guard let card else { return }
         guard animated else {
-            card.container.removeFromSuperlayer()
+            card.panel.orderOut(nil)
             return
         }
         let fadeDelay = card.hasImage && card.lift > 1 ? 0.2 : 0
@@ -250,10 +259,11 @@ public final class SelectionOverlay {
         card.container.opacity = 0
         CATransaction.commit()
         card.container.add(fade, forKey: "retire")
-        let layer = card.container
-        Task { @MainActor in
+        retiring.append(card)
+        Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(Int((fadeDelay + 0.2) * 1000)))
-            layer.removeFromSuperlayer()
+            card.panel.orderOut(nil)
+            self?.retiring.removeAll { $0 === card }
         }
     }
 
@@ -262,34 +272,15 @@ public final class SelectionOverlay {
         return CGFloat(transform.m11)
     }
 
-    private func overlap(_ a: CGRect, _ b: CGRect) -> CGFloat {
-        let intersection = a.intersection(b)
-        return intersection.isNull ? 0 : intersection.width * intersection.height
-    }
-
     private func appKitRect(fromGlobal rect: CGRect) -> CGRect {
         ScreenGeometry.appKitRect(fromGlobal: rect, primaryScreenHeight: NSScreen.screens.first?.frame.height ?? 0)
-    }
-
-    private func rebuildPanelsIfNeeded() {
-        let screens = NSScreen.screens
-        let unchanged = panels.count == screens.count && zip(panels, screens).allSatisfy { $0.frame == $1.frame }
-        guard !unchanged else { return }
-        panels.forEach { $0.orderOut(nil) }
-        current = nil
-        panels = screens.map { screen in
-            let panel = Self.makePanel(frame: screen.frame)
-            let view = NSView(frame: NSRect(origin: .zero, size: screen.frame.size))
-            view.wantsLayer = true
-            panel.contentView = view
-            return panel
-        }
     }
 
     private static func makePanel(frame: NSRect) -> NSPanel {
         let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.assistiveTechHighWindow)))
-        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        // A screen-sized or all-desktops panel makes Mission Control drop every window from the desktop previews.
+        panel.collectionBehavior = [.stationary, .ignoresCycle, .fullScreenAuxiliary]
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false

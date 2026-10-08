@@ -4,6 +4,12 @@ All notable changes to Tabby are documented here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.0-alpha.3] - 2026-10-08
+
+### Fixed
+
+- Mission Control's desktop previews show each desktop's own windows again while Tabby is highlighting one. Tabby's overlay was a transparent window as big as the screen and present on every desktop, and Mission Control dropped every window behind it from the previews. Now each highlight is a small window of its own, on the current desktop only.
+
 ## [0.1.0-alpha.2] - 2026-10-08
 
 ### Added
