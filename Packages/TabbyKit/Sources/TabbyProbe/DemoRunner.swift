@@ -59,7 +59,7 @@ final class DemoRunner {
             say("● " + t("Mission Control · \(count) windows", "Mission Control · \(count) ventanas"))
         case .selected(let window):
             say("  → \(describe(window))")
-        case .activated(let window, let exact, let strategy):
+        case .activated(let window, let exact, let strategy, _):
             lastActivation = (window, exact, strategy)
             say("  \(exact ? "✅" : "⚠️") \(describe(window))" + (exact ? "" : t(" (focus did not match)", " (el foco no coincidió)")))
         case .closed:

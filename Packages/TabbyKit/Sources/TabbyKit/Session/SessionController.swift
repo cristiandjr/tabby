@@ -6,7 +6,7 @@ public final class SessionController {
     public enum Event: Sendable {
         case opened(windows: Int)
         case selected(MissionWindow)
-        case activated(MissionWindow, exact: Bool, strategy: ActivationStrategy)
+        case activated(MissionWindow, exact: Bool, strategy: ActivationStrategy, elapsed: Duration)
         case closed
     }
 
@@ -258,29 +258,46 @@ public final class SessionController {
         let element = provider.element(for: id)
         let thumbnail = thumbnails[id]
         Task { @MainActor [weak self] in
-            var strategy = ActivationStrategy.accessibility
+            let clock = ContinuousClock()
+            let started = clock.now
+            var strategy: ActivationStrategy = thumbnail == nil ? .accessibility : .dockThumbnail
             if let thumbnail {
-                strategy = .dockThumbnail
                 WindowActivator.pressThumbnail(thumbnail.element)
-                for _ in 0..<12 where WindowActivator.focusedWindow()?.windowID != id {
-                    try? await Task.sleep(for: .milliseconds(50))
-                }
+                await Self.waitUntilMissionControlCloses(timeout: .milliseconds(300))
             }
-            if WindowActivator.focusedWindow()?.windowID != id, let element {
+            if Self.missionControlIsOpen {
                 strategy = .accessibility
-                _ = WindowActivator.activateWithAccessibility(pid: window.pid, window: element)
-                try? await Task.sleep(for: .milliseconds(150))
-                if DockAccessibility.isMissionControlOpen(DockAccessibility.topLevelSignature()) {
-                    WindowActivator.postKey(KeyCode.escape)
-                    try? await Task.sleep(for: .milliseconds(350))
-                }
-                if WindowActivator.focusedWindow()?.windowID != id {
-                    _ = WindowActivator.activateWithAccessibility(pid: window.pid, window: element)
-                    try? await Task.sleep(for: .milliseconds(150))
-                }
+                WindowActivator.postKey(KeyCode.escape)
+                await Self.waitUntilMissionControlCloses(timeout: .milliseconds(500))
             }
-            let exact = WindowActivator.focusedWindow()?.windowID == id
-            self?.onEvent?(.activated(window, exact: exact, strategy: strategy))
+            let exact = await Self.focus(id, pid: window.pid, element: element, timeout: .milliseconds(700))
+            self?.onEvent?(.activated(window, exact: exact, strategy: strategy, elapsed: clock.now - started))
         }
+    }
+
+    private static var missionControlIsOpen: Bool {
+        DockAccessibility.isMissionControlOpen(DockAccessibility.topLevelSignature())
+    }
+
+    private static func waitUntilMissionControlCloses(timeout: Duration) async {
+        let deadline = ContinuousClock().now + timeout
+        while missionControlIsOpen, ContinuousClock().now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
+    private static func focus(_ id: CGWindowID, pid: pid_t, element: AXUIElement?, timeout: Duration) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now + timeout
+        var nextAttempt = clock.now
+        while !WindowActivator.isFocused(id, pid: pid) {
+            guard clock.now < deadline else { return false }
+            if let element, clock.now >= nextAttempt {
+                _ = WindowActivator.activateWithAccessibility(pid: pid, window: element)
+                nextAttempt = clock.now + .milliseconds(80)
+            }
+            try? await Task.sleep(for: .milliseconds(15))
+        }
+        return true
     }
 }

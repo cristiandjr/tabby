@@ -38,6 +38,12 @@ public enum WindowActivator {
         return (app.processIdentifier, window.flatMap(PrivateAXBridge.windowID(of:)))
     }
 
+    public static func isFocused(_ windowID: CGWindowID, pid: pid_t) -> Bool {
+        let app = AX.application(pid)
+        guard AX.bool(app, kAXFrontmostAttribute) == true, let window = AX.element(app, kAXFocusedWindowAttribute) else { return false }
+        return PrivateAXBridge.windowID(of: window) == windowID
+    }
+
     public static func postKey(_ keyCode: CGKeyCode, flags: CGEventFlags = []) {
         let source = CGEventSource(stateID: .hidSystemState)
         for isDown in [true, false] {

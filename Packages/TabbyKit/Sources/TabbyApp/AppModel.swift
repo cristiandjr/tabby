@@ -101,8 +101,8 @@ final class AppModel {
         switch event {
         case .opened(let windows):
             log.info("mission control opened with \(windows) windows")
-        case .activated(_, let exact, let strategy):
-            log.info("activated exact=\(exact) strategy=\(strategy.rawValue, privacy: .public)")
+        case .activated(_, let exact, let strategy, let elapsed):
+            log.info("activated exact=\(exact) strategy=\(strategy.rawValue, privacy: .public) in \(Int(elapsed / .milliseconds(1)))ms")
         case .selected, .closed:
             break
         }
