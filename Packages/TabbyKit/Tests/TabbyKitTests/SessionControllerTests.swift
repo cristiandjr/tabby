@@ -292,4 +292,259 @@ struct SessionControllerTests {
         controller.perform(.activate)
         #expect(activator.calls.isEmpty)
     }
+
+    private func switchDesktop(to newWindows: [MissionWindow]) {
+        windows.windows = newWindows
+        controller.refresh()
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+    }
+
+    @Test func switchingDesktopsInsideMissionControlRebuildsTheSession() {
+        var changed: Int?
+        controller.onEvent = { event in
+            if case .desktopChanged(let count) = event { changed = count }
+        }
+        open()
+        controller.perform(.next)
+        clock.advance(by: SessionController.openingSettleTime)
+        windows.frames[7] = CGRect(x: 200, y: 150, width: 600, height: 450)
+        switchDesktop(to: [makeWindow(7, app: "Sublime"), makeWindow(8, app: "Notes")])
+        #expect(controller.state.session?.engine.windowIDs == [7, 8])
+        #expect(controller.state.session?.selected?.id == 7)
+        #expect(presenter.dismissals == 1)
+        #expect(presenter.prepared.count == 2)
+        #expect(presenter.last?.windowID == 7)
+        #expect(presenter.last?.isHighlighted == false)
+        #expect(keyboard.mode == .intercept)
+        #expect(changed == 2)
+        clock.advance(by: HighlightTracker.openingDelay)
+        controller.refresh()
+        #expect(presenter.last?.windowID == 7)
+        #expect(presenter.last?.isHighlighted == true)
+    }
+
+    @Test func hidesTheStaleHighlightAndWaitsForTheTransitionToSettle() {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        windows.windows = [makeWindow(1)]
+        controller.refresh()
+        #expect(presenter.dismissals == 1)
+        clock.advance(by: .milliseconds(60))
+        windows.windows = [makeWindow(1), makeWindow(7)]
+        controller.refresh()
+        clock.advance(by: .milliseconds(60))
+        windows.windows = [makeWindow(7)]
+        controller.refresh()
+        clock.advance(by: .milliseconds(60))
+        controller.refresh()
+        #expect(controller.state.session?.engine.windowIDs == [1, 2, 3])
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+        #expect(controller.state.session?.engine.windowIDs == [7])
+        #expect(presenter.prepared.count == 2)
+    }
+
+    @Test func stopsWaitingWhenTheDesktopKeepsChanging() {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        for step in 0..<18 {
+            windows.windows = step.isMultiple(of: 2) ? [makeWindow(7)] : [makeWindow(7), makeWindow(8)]
+            controller.refresh()
+            clock.advance(by: .milliseconds(60))
+        }
+        #expect(controller.state.session?.engine.windowIDs == [7, 8])
+    }
+
+    @Test func returnAsTheDesktopStartsSlidingWaitsForTheNewDesktop() async {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        controller.refresh()
+        windows.frames[1] = CGRect(x: -200, y: 100, width: 500, height: 400)
+        controller.perform(.activate)
+        #expect(activator.calls.isEmpty)
+        clock.advance(by: .milliseconds(60))
+        windows.windows = [makeWindow(7)]
+        controller.refresh()
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+        await Task.yield()
+        await Task.yield()
+        #expect(activator.calls.map(\.window.id) == [7])
+    }
+
+    @Test func keysWorkRightAwayWhileTheNewDesktopFinishesSliding() async {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        windows.frames[7] = CGRect(x: 600, y: 100, width: 500, height: 400)
+        switchDesktop(to: [makeWindow(7), makeWindow(8)])
+        windows.frames[7] = CGRect(x: 500, y: 100, width: 500, height: 400)
+        controller.perform(.activate)
+        await Task.yield()
+        await Task.yield()
+        #expect(activator.calls.map(\.window.id) == [7])
+    }
+
+    @Test func aFailedMoveKeepsItsNoticeWhileTheThumbnailSettles() async {
+        mover.result = .failed(.dropRejected, createdDesktops: 0)
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        controller.perform(.moveToDesktop(2))
+        await Task.yield()
+        await Task.yield()
+        let dismissals = presenter.dismissals
+        windows.frames[2] = CGRect(x: 640, y: 160, width: 500, height: 400)
+        controller.refresh()
+        #expect(presenter.dismissals == dismissals)
+        #expect(presenter.notices.count == 1)
+    }
+
+    @Test func movingThumbnailsHideTheHighlightUntilTheyStop() {
+        var changes = 0
+        controller.onEvent = { event in
+            if case .desktopChanged = event { changes += 1 }
+        }
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        controller.refresh()
+        #expect(presenter.last?.isHighlighted == true)
+        windows.frames[2] = CGRect(x: 600, y: 100, width: 500, height: 400)
+        controller.refresh()
+        #expect(presenter.dismissals == 1)
+        clock.advance(by: .milliseconds(30))
+        windows.frames[2] = CGRect(x: 560, y: 100, width: 500, height: 400)
+        controller.refresh()
+        clock.advance(by: .milliseconds(60))
+        controller.refresh()
+        #expect(presenter.dismissals == 1)
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+        #expect(changes == 0)
+        #expect(controller.state.session?.selected?.id == 2)
+        #expect(presenter.last?.isHighlighted == true)
+        #expect(presenter.last?.thumbnailFrame == CGRect(x: 560, y: 100, width: 500, height: 400))
+    }
+
+    @Test func returnDuringADesktopSwitchActivatesAWindowOfTheNewDesktop() async {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        windows.windows = [makeWindow(7), makeWindow(8)]
+        controller.perform(.activate)
+        #expect(controller.state.isNavigating)
+        #expect(activator.calls.isEmpty)
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+        await Task.yield()
+        await Task.yield()
+        #expect(activator.calls.map(\.window.id) == [7])
+    }
+
+    @Test func returnActivatesAWindowOfTheDesktopShownInMissionControl() async {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        switchDesktop(to: [makeWindow(7), makeWindow(8)])
+        controller.perform(.activate)
+        await Task.yield()
+        await Task.yield()
+        #expect(activator.calls.map(\.window.id) == [7])
+    }
+
+    @Test func tabDuringADesktopSwitchMovesThroughTheNewDesktop() {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        windows.windows = [makeWindow(7), makeWindow(8), makeWindow(9)]
+        controller.perform(.next)
+        controller.perform(.next)
+        #expect(controller.state.session?.engine.windowIDs == [1, 2, 3])
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+        #expect(controller.state.session?.selected?.id == 9)
+        #expect(presenter.last?.windowID == 9)
+    }
+
+    @Test func comingBackToTheSameDesktopKeepsTheSelection() {
+        var changes = 0
+        controller.onEvent = { event in
+            if case .desktopChanged = event { changes += 1 }
+        }
+        open()
+        controller.perform(.next)
+        clock.advance(by: SessionController.openingSettleTime)
+        let original = windows.windows
+        let shown = presenter.presentations.count
+        windows.windows = [makeWindow(7)]
+        controller.refresh()
+        clock.advance(by: .milliseconds(60))
+        windows.windows = original
+        controller.refresh()
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+        #expect(changes == 0)
+        #expect(controller.state.session?.engine.windowIDs == [1, 2, 3])
+        #expect(controller.state.session?.selected?.id == 3)
+        #expect(presenter.presentations.count == shown + 1)
+        #expect(presenter.last?.windowID == 3)
+    }
+
+    @Test func keepsTheSelectionWhenAWindowOfTheDesktopCloses() {
+        open()
+        controller.perform(.next)
+        clock.advance(by: SessionController.openingSettleTime)
+        switchDesktop(to: windows.windows.filter { $0.id != 1 })
+        #expect(controller.state.session?.engine.windowIDs == [2, 3])
+        #expect(controller.state.session?.selected?.id == 3)
+    }
+
+    @Test func closingMissionControlDuringADesktopSwitchDropsTheQueuedKeys() async {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        windows.windows = [makeWindow(7)]
+        controller.perform(.activate)
+        close()
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+        await Task.yield()
+        #expect(activator.calls.isEmpty)
+        #expect(!controller.isSessionActive)
+    }
+
+    @Test func doesNotRebuildWhileTheDesktopStaysTheSame() {
+        open()
+        controller.perform(.next)
+        clock.advance(by: SessionController.openingSettleTime)
+        controller.refresh()
+        controller.refresh()
+        #expect(presenter.prepared.count == 1)
+        #expect(controller.state.session?.selected?.id == 3)
+    }
+
+    @Test func ignoresChangesWhileMissionControlIsStillOpening() {
+        open()
+        windows.windows = [makeWindow(7)]
+        controller.refresh()
+        #expect(controller.state.session?.engine.windowIDs == [1, 2, 3])
+    }
+
+    @Test func comesBackFromAnEmptyDesktop() {
+        open()
+        let original = windows.windows
+        clock.advance(by: SessionController.openingSettleTime)
+        switchDesktop(to: [])
+        #expect(controller.state.session?.selected == nil)
+        switchDesktop(to: original)
+        #expect(controller.state.session?.engine.windowIDs == [1, 2, 3])
+        #expect(controller.state.session?.selected?.id == 1)
+    }
+
+    @Test func movingAWindowDoesNotLookLikeADesktopChange() async {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        controller.perform(.moveToDesktop(3))
+        windows.windows = windows.windows.filter { $0.id != 2 }
+        await Task.yield()
+        await Task.yield()
+        controller.refresh()
+        #expect(controller.state.session?.selected?.id == 3)
+        #expect(controller.state.session?.engine.windowIDs == [1, 3])
+    }
 }

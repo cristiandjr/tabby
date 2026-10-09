@@ -7,6 +7,7 @@ public final class SessionController {
         case selected(MissionWindow)
         case activated(MissionWindow, ActivationResult)
         case moved(MissionWindow, desktop: Int, SpaceMoveResult)
+        case desktopChanged(windows: Int)
         case closed
     }
 
@@ -35,13 +36,29 @@ public final class SessionController {
         dependencies.keyboard.timeoutCount
     }
 
+    static let openingSettleTime: Duration = .milliseconds(400)
+    static let desktopStableTime: Duration = .milliseconds(100)
+    static let desktopChangeTimeout: Duration = .seconds(1)
+    static let desktopMotionThreshold: CGFloat = 20
+
+    private struct DesktopChange {
+        var visible: Set<CGWindowID>
+        var frames: [CGWindowID: CGRect]
+        var stableSince: ContinuousClock.Instant
+        let detectedAt: ContinuousClock.Instant
+    }
+
     private let dependencies: SessionDependencies
+    private let log = Log.logger("session")
     private var detector = MissionControlDetector()
     private var tracker = HighlightTracker()
     private var presented: SelectionPresentation?
     private var refreshTick = 0
     private var pollTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
+    private var desktopChange: DesktopChange?
+    private var motionGraceEnd: ContinuousClock.Instant?
+    private var pendingActions: [SessionAction] = []
 
     public convenience init() {
         self.init(dependencies: .live())
@@ -98,6 +115,10 @@ public final class SessionController {
 
     func perform(_ action: SessionAction) {
         guard case .navigating(var session) = state else { return }
+        if desktopChange != nil || beginsDesktopChange(in: session) {
+            pendingActions.append(action)
+            return
+        }
         switch action {
         case .next, .previous:
             session.move(action)
@@ -116,6 +137,11 @@ public final class SessionController {
 
     func refresh() {
         guard case .navigating(var session) = state else { return }
+        if desktopChange != nil {
+            settleDesktopChange(in: session)
+            return
+        }
+        if beginsDesktopChange(in: session) { return }
         refreshTick += 1
         tracker.update(liveFrames: dependencies.windows.liveFrames(of: session.engine.windowIDs))
         if refreshTick % 4 == 0 || session.thumbnails.count < session.windows.count {
@@ -135,16 +161,10 @@ public final class SessionController {
         let all = dependencies.windows.snapshot()
         guard let display = all.first?.displayID else { return }
         let windows = all.filter { $0.displayID == display }
-        var session = NavigationSession(windows: windows)
+        var session = NavigationSession(windows: windows, display: display, startedAt: dependencies.clock.now)
         session.thumbnails = dependencies.thumbnails.thumbnails(for: windows)
-        let ids = windows.map(\.id)
-        tracker.begin(
-            realSizes: ids.reduce(into: [:]) { result, id in result[id] = dependencies.windows.realSize(of: id) },
-            liveFrames: dependencies.windows.liveFrames(of: ids),
-            openedAt: dependencies.clock.now,
-            pointer: dependencies.pointer.location,
-            skipsOpeningDelay: dependencies.reducesMotion()
-        )
+        session.visibleWindows = dependencies.windows.visibleWindowIDs(on: display)
+        startTracking(windows)
         presented = nil
         refreshTick = 0
         state = .navigating(session)
@@ -156,6 +176,83 @@ public final class SessionController {
         dependencies.pointer.start { [weak self] location in
             self?.pointerMoved(to: location)
         }
+    }
+
+    private func beginsDesktopChange(in session: NavigationSession) -> Bool {
+        let now = dependencies.clock.now
+        guard now - session.startedAt >= Self.openingSettleTime else { return false }
+        let visible = dependencies.windows.visibleWindowIDs(on: session.display)
+        let frames = dependencies.windows.liveFrames(of: Array(visible))
+        let listChanged = visible != session.visibleWindows
+        let sliding = !listChanged
+            && now >= (motionGraceEnd ?? now)
+            && Self.displacement(from: tracker.liveFrames, to: frames) > Self.desktopMotionThreshold
+        guard listChanged || sliding else { return false }
+        log.info("desktop changing: \(listChanged ? "window list" : "thumbnails sliding", privacy: .public)")
+        desktopChange = DesktopChange(visible: visible, frames: frames, stableSince: now, detectedAt: now)
+        dependencies.presenter.dismiss()
+        presented = nil
+        startRefreshing()
+        return true
+    }
+
+    private func settleDesktopChange(in session: NavigationSession) {
+        guard var change = desktopChange else { return }
+        let now = dependencies.clock.now
+        let visible = dependencies.windows.visibleWindowIDs(on: session.display)
+        let frames = dependencies.windows.liveFrames(of: Array(visible))
+        let unchanged = visible == session.visibleWindows
+        // Until the window list changes, a sliding desktop is only visible as motion.
+        if visible != change.visible || (unchanged && Self.displacement(from: change.frames, to: frames) > Self.desktopMotionThreshold) {
+            change.stableSince = now
+        }
+        change.visible = visible
+        change.frames = frames
+        desktopChange = change
+        guard now - change.stableSince >= Self.desktopStableTime || now - change.detectedAt >= Self.desktopChangeTimeout else { return }
+        desktopChange = nil
+        let waited = Int((now - change.detectedAt) / .milliseconds(1))
+        log.info("desktop settled after \(waited) ms: \(unchanged ? "same windows" : "\(visible.count) visible windows", privacy: .public) · \(self.pendingActions.count) keys waiting")
+        if unchanged {
+            tracker.update(liveFrames: frames)
+            dependencies.presenter.prepare(for: Array(session.windows.values))
+            render()
+        } else {
+            rebuildForCurrentDesktop(from: session, visible: visible)
+        }
+        let actions = pendingActions
+        pendingActions = []
+        for action in actions {
+            perform(action)
+        }
+    }
+
+    private func rebuildForCurrentDesktop(from previous: NavigationSession, visible: Set<CGWindowID>) {
+        let windows = dependencies.windows.snapshot().filter { $0.displayID == previous.display }
+        let kept = previous.engine.selectedID.flatMap { id in windows.firstIndex { $0.id == id } }
+        var session = NavigationSession(windows: windows, display: previous.display, startedAt: previous.startedAt, initialIndex: kept ?? 0)
+        session.thumbnails = dependencies.thumbnails.thumbnails(for: windows)
+        session.visibleWindows = visible
+        startTracking(windows)
+        motionGraceEnd = dependencies.clock.now + Self.openingSettleTime
+        presented = nil
+        refreshTick = 0
+        state = .navigating(session)
+        dependencies.presenter.prepare(for: windows)
+        render()
+        onEvent?(.desktopChanged(windows: windows.count))
+        startRefreshing()
+    }
+
+    private func startTracking(_ windows: [MissionWindow]) {
+        let ids = windows.map(\.id)
+        tracker.begin(
+            realSizes: ids.reduce(into: [:]) { result, id in result[id] = dependencies.windows.realSize(of: id) },
+            liveFrames: dependencies.windows.liveFrames(of: ids),
+            openedAt: dependencies.clock.now,
+            pointer: dependencies.pointer.location,
+            skipsOpeningDelay: dependencies.reducesMotion()
+        )
     }
 
     private func finishSession() {
@@ -196,7 +293,9 @@ public final class SessionController {
         guard case .movingWindow(var session, let target, _) = state, target == window.id else { return }
         if result.moved {
             session.remove(window.id)
+            session.visibleWindows = dependencies.windows.visibleWindowIDs(on: session.display)
         }
+        motionGraceEnd = dependencies.clock.now + Self.openingSettleTime
         state = .navigating(session)
         tracker.reclaim(pointer: dependencies.pointer.location)
         dependencies.presenter.prepare(for: Array(session.windows.values))
@@ -223,6 +322,9 @@ public final class SessionController {
     private func stopSessionWork() {
         refreshTask?.cancel()
         refreshTask = nil
+        desktopChange = nil
+        motionGraceEnd = nil
+        pendingActions = []
         dependencies.pointer.stop()
         dependencies.keyboard.setMode(.off)
         dependencies.presenter.dismiss()
@@ -235,7 +337,7 @@ public final class SessionController {
         refreshTask = Task { [weak self] in
             var tick = 0
             while !Task.isCancelled {
-                await clock.sleep(for: .milliseconds(tick < 15 ? 60 : 150))
+                await clock.sleep(for: self?.refreshInterval(tick: tick) ?? .milliseconds(150))
                 tick += 1
                 guard let self, !Task.isCancelled else { return }
                 self.refresh()
@@ -243,8 +345,26 @@ public final class SessionController {
         }
     }
 
+    private static func displacement(from old: [CGWindowID: CGRect], to new: [CGWindowID: CGRect]) -> CGFloat {
+        var largest: CGFloat = 0
+        for (id, frame) in new {
+            guard let previous = old[id] else { continue }
+            let dx: CGFloat = abs(previous.minX - frame.minX)
+            let dy: CGFloat = abs(previous.minY - frame.minY)
+            let dw: CGFloat = abs(previous.width - frame.width)
+            let dh: CGFloat = abs(previous.height - frame.height)
+            largest = max(largest, dx, dy, dw, dh)
+        }
+        return largest
+    }
+
+    private func refreshInterval(tick: Int) -> Duration {
+        desktopChange != nil ? .milliseconds(30) : .milliseconds(tick < 15 ? 60 : 150)
+    }
+
     private func render() {
-        guard case .navigating(let session) = state,
+        guard desktopChange == nil,
+              case .navigating(let session) = state,
               let presentation = tracker.presentation(for: session, now: dependencies.clock.now),
               presentation != presented
         else { return }

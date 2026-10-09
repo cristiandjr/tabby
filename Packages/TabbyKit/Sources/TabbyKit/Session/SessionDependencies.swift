@@ -10,6 +10,7 @@ public protocol WindowProviding: AnyObject {
     func snapshot() -> [MissionWindow]
     func realSize(of id: CGWindowID) -> CGSize?
     func liveFrames(of ids: [CGWindowID]) -> [CGWindowID: CGRect]
+    func visibleWindowIDs(on display: CGDirectDisplayID) -> Set<CGWindowID>
 }
 
 @MainActor

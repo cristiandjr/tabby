@@ -4,10 +4,11 @@ All notable changes to Tabby are documented here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
-## [0.1.0-alpha.3] - 2026-10-08
+## [0.1.0-alpha.3] - 2026-10-09
 
 ### Fixed
 
+- Switching desktops inside Mission Control, for example with <kbd>⌃</kbd><kbd>←</kbd> / <kbd>⌃</kbd><kbd>→</kbd>, now updates Tabby's window list. <kbd>Return</kbd> opens a window of the desktop you're looking at instead of taking you back to the one you started on. Keys pressed while the desktop is still sliding wait until it settles, and the highlight comes back on the first window of the new desktop.
 - Mission Control's desktop previews show each desktop's own windows again while Tabby is highlighting one. Tabby's overlay was a transparent window as big as the screen and present on every desktop, and Mission Control dropped every window behind it from the previews. Now each highlight is a small window of its own, on the current desktop only.
 
 ## [0.1.0-alpha.2] - 2026-10-08

@@ -66,6 +66,10 @@ final class FakeWindows: WindowProviding {
     func liveFrames(of ids: [CGWindowID]) -> [CGWindowID: CGRect] {
         frames.filter { ids.contains($0.key) }
     }
+
+    func visibleWindowIDs(on display: CGDirectDisplayID) -> Set<CGWindowID> {
+        Set(windows.filter { $0.displayID == display }.map(\.id))
+    }
 }
 
 @MainActor

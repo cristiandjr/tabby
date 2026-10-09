@@ -64,6 +64,8 @@ final class DemoRunner {
             say("  \(result.exact ? "✅" : "⚠️") \(describe(window)) · \(Int(result.elapsed / .milliseconds(1))) ms" + (result.exact ? "" : t(" (focus did not match)", " (el foco no coincidió)")))
         case .moved(let window, let desktop, let result):
             say("  \(result.moved ? "↗︎" : "⚠️") \(describe(window)) → \(t("Desktop", "Escritorio")) \(desktop) · \(String(describing: result))")
+        case .desktopChanged(let count):
+            say("↔︎ " + t("Desktop changed · \(count) windows", "Cambio de escritorio · \(count) ventanas"))
         case .closed:
             say("○ " + t("closed", "cerrado"))
         }

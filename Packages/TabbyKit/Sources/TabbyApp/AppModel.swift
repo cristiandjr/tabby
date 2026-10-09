@@ -348,6 +348,9 @@ final class AppModel {
         case .activated(_, let result):
             lastSession?.activation = result
             log.info("activated exact=\(result.exact) strategy=\(result.strategy.rawValue, privacy: .public) in \(Int(result.elapsed / .milliseconds(1)))ms")
+        case .desktopChanged(let windows):
+            lastSession = DiagnosticsReport.Session(windows: windows, thumbnails: controller.matchedThumbnails)
+            log.info("desktop changed inside mission control: \(windows) windows")
         case .moved(_, let desktop, let result):
             lastSession?.move = result
             log.info("moved to desktop \(desktop) result=\(String(describing: result), privacy: .public)")

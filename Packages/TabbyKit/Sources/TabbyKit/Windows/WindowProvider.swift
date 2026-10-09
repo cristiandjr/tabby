@@ -28,6 +28,7 @@ public final class WindowProvider {
 
     public private(set) var lastDiagnostics = Diagnostics()
     private var elements: [CGWindowID: AXUIElement] = [:]
+    private var systemProcesses: [pid_t: Bool] = [:]
 
     public init() {}
 
@@ -91,6 +92,24 @@ public final class WindowProvider {
         return windows
     }
 
+    public func visibleWindowIDs(on display: CGDirectDisplayID) -> Set<CGWindowID> {
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let records = CGWindowSource.onScreen().filter { record in
+            record.layer == 0 && record.alpha > 0.01 && record.pid != ownPID
+                && !isSystemProcess(record.pid)
+                && Self.displayID(for: record.bounds) == display
+        }
+        return Set(records.map(\.id))
+    }
+
+    private func isSystemProcess(_ pid: pid_t) -> Bool {
+        if let known = systemProcesses[pid] { return known }
+        let app = NSRunningApplication(processIdentifier: pid)
+        let system = app.map { $0.activationPolicy == .prohibited || Self.excludedBundleIDs.contains($0.bundleIdentifier ?? "") } ?? false
+        systemProcesses[pid] = system
+        return system
+    }
+
     private func axWindows(for pid: pid_t, cache: inout [pid_t: [AXUIElement]]) -> [AXUIElement] {
         if let cached = cache[pid] { return cached }
         let list = AX.elements(AX.application(pid), kAXWindowsAttribute)
@@ -120,7 +139,7 @@ public final class WindowProvider {
         return index
     }
 
-    private static func displayID(for frame: CGRect) -> CGDirectDisplayID {
+    static func displayID(for frame: CGRect) -> CGDirectDisplayID {
         var display: CGDirectDisplayID = 0
         var count: UInt32 = 0
         CGGetDisplaysWithPoint(CGPoint(x: frame.midX, y: frame.midY), 1, &display, &count)
