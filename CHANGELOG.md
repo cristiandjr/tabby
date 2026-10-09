@@ -4,6 +4,10 @@ All notable changes to Tabby are documented here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- The menu bar icon is now the colorful Tabby icon instead of a black-and-white silhouette, so it's easier to spot.
+
 ## [0.1.0-alpha.3] - 2026-10-09
 
 ### Fixed
