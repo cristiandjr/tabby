@@ -77,10 +77,28 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 
 Tabby is a single download, with no installer. Use the **Download** button at the top, or:
 
-1. Download [**Tabby.zip**](../../releases/latest/download/Tabby.zip) from the latest release and open it.
-2. Open **Tabby.app**. Tabby isn't notarized yet, so macOS blocks it the first time: go to **System Settings → Privacy & Security** and click **Open Anyway**.
-3. A short welcome tour guides you through the **Accessibility** permission and a first try.
-4. Optional: move Tabby to **Applications**. You only need this for *Launch at Login*.
+1. Download [**Tabby.zip**](../../releases/latest/download/Tabby.zip) from the latest release and open it to unzip **Tabby.app**.
+2. Drag **Tabby.app** to your **Applications** folder. It also runs from Downloads, but *Launch at Login* needs it in Applications.
+3. Open **Tabby.app**.
+
+#### The first time macOS blocks it
+
+Tabby is free and isn't notarized by Apple, which requires a paid developer account. So the first time you open it, macOS says that Apple could not verify that Tabby is free of malware, and offers to move it to the Trash. Tabby is safe and its code is open, so:
+
+1. Click **Done**. Don't move it to the Trash.
+2. Open **System Settings → Privacy & Security** and scroll down to **Security**. You'll see *"Tabby" was blocked to protect your Mac.*
+3. Click **Open Anyway**.
+4. macOS asks again: click **Open Anyway**.
+5. Enter your password or use Touch ID.
+
+Tabby opens, its icon appears in the menu bar, and a short welcome tour guides you through the **Accessibility** permission and a first try. You only do this once, although a new version downloaded from the internet may ask again.
+
+#### If Tabby still doesn't open
+
+- **Nothing happens after Open Anyway:** the password or Touch ID request may be waiting on another display or on another desktop. Open Mission Control to find it.
+- **Double-clicking Tabby does nothing:** a copy may be stuck waiting for that approval. Open **Activity Monitor**, select **Tabby**, click **ⓧ** and choose **Force Quit**. Then go through the steps above again.
+- **There's no Open Anyway button:** it's only there for about an hour after macOS blocks Tabby. Open Tabby again so that macOS blocks it, and go back to **Privacy & Security**.
+- **You have several copies of Tabby:** keep only the one in **Applications** and delete the rest, including the zip, so you always open the same one.
 
 ### Privacy
 
@@ -173,10 +191,28 @@ Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima
 
 Tabby es una sola descarga, sin instalador. Usa el botón **Download** de arriba, o:
 
-1. Descarga [**Tabby.zip**](../../releases/latest/download/Tabby.zip) de la última versión y ábrelo.
-2. Abre **Tabby.app**. Como todavía no está notarizada, macOS la bloquea la primera vez: ve a **Configuración del Sistema → Privacidad y seguridad** y haz clic en **Abrir igualmente**.
-3. Una bienvenida corta te guía con el permiso de **Accesibilidad** y una primera prueba.
-4. Opcional: mueve Tabby a **Aplicaciones**. Solo hace falta para *Abrir al iniciar sesión*.
+1. Descarga [**Tabby.zip**](../../releases/latest/download/Tabby.zip) de la última versión y ábrelo para descomprimir **Tabby.app**.
+2. Arrastra **Tabby.app** a la carpeta **Aplicaciones**. También funciona desde Descargas, pero *Abrir al iniciar sesión* necesita que esté en Aplicaciones.
+3. Abre **Tabby.app**.
+
+#### La primera vez, macOS la bloquea
+
+Tabby es gratis y no está notarizada por Apple, porque eso requiere una cuenta paga de desarrollador. Por eso, la primera vez que la abres, macOS avisa que Apple no pudo verificar que Tabby no contenga software malicioso y ofrece mandarla a la papelera. Tabby es segura y su código es abierto, así que:
+
+1. Haz clic en **Listo**. No la mandes a la papelera.
+2. Abre **Configuración del Sistema → Privacidad y seguridad** y baja hasta **Seguridad**. Vas a ver *Se bloqueó "Tabby" para proteger tu Mac.*
+3. Haz clic en **Abrir de todos modos**.
+4. macOS vuelve a preguntar: haz clic en **Abrir de todos modos**.
+5. Escribe tu contraseña o usa Touch ID.
+
+Tabby se abre, su ícono aparece en la barra de menús y una bienvenida corta te guía con el permiso de **Accesibilidad** y una primera prueba. Esto se hace una sola vez, aunque una versión nueva descargada de internet puede volver a pedirlo.
+
+#### Si Tabby sigue sin abrir
+
+- **No pasa nada después de «Abrir de todos modos»:** el pedido de contraseña o Touch ID puede estar esperando en otra pantalla o en otro escritorio. Abre Mission Control para encontrarlo.
+- **Haces doble clic en Tabby y no pasa nada:** puede haber una copia trabada esperando esa aprobación. Abre el **Monitor de Actividad**, selecciona **Tabby**, haz clic en **ⓧ** y elige **Forzar salida**. Después repite los pasos de arriba.
+- **No aparece «Abrir de todos modos»:** el botón solo está durante una hora, más o menos, después de que macOS bloquea Tabby. Vuelve a abrir Tabby para que macOS la bloquee y entra otra vez a **Privacidad y seguridad**.
+- **Tienes varias copias de Tabby:** deja solo la de **Aplicaciones** y borra las demás, también el zip, así siempre abres la misma.
 
 ### Privacidad
 
