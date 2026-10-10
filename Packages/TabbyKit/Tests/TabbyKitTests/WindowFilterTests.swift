@@ -35,6 +35,18 @@ struct WindowFilterTests {
         #expect(ids == expected)
     }
 
+    @MainActor @Test func picksTheDisplaySharingTheMostAreaAndNoneWhenOffScreen() {
+        let displays: [(id: CGDirectDisplayID, bounds: CGRect)] = [
+            (1, CGRect(x: 0, y: 0, width: 1920, height: 1080)),
+            (2, CGRect(x: 115, y: -1050, width: 1680, height: 1050)),
+        ]
+        #expect(WindowProvider.display(for: CGRect(x: 155, y: 101, width: 1722, height: 941), among: displays) == 1)
+        #expect(WindowProvider.display(for: CGRect(x: 200, y: -600, width: 800, height: 500), among: displays) == 2)
+        #expect(WindowProvider.display(for: CGRect(x: 100, y: -300, width: 800, height: 900), among: displays) == 1)
+        #expect(WindowProvider.display(for: CGRect(x: -2023, y: 101, width: 1722, height: 941), among: displays) == nil)
+        #expect(WindowProvider.display(for: CGRect(x: 1920, y: 0, width: 300, height: 300), among: displays) == nil)
+    }
+
     @Test func parsesWindowServerDictionaries() {
         let dictionary: [String: Any] = [
             kCGWindowNumber as String: NSNumber(value: 42),

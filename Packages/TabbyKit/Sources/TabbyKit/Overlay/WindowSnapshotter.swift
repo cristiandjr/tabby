@@ -9,9 +9,12 @@ final class WindowSnapshotter {
         CGPreflightScreenCaptureAccess()
     }
 
+    static let maximumAttempts = 2
+
     private var content: Task<SCShareableContent?, Never>?
     private var images: [CGWindowID: CGImage] = [:]
     private var pending: [CGWindowID: Task<CGImage?, Never>] = [:]
+    private var attempts: [CGWindowID: Int] = [:]
 
     func warmUp() {
         content = Task {
@@ -30,6 +33,7 @@ final class WindowSnapshotter {
         pending.values.forEach { $0.cancel() }
         pending = [:]
         images = [:]
+        attempts = [:]
     }
 
     func cachedImage(for id: CGWindowID) -> CGImage? {
@@ -37,7 +41,7 @@ final class WindowSnapshotter {
     }
 
     func prefetch(_ id: CGWindowID, size: CGSize) {
-        guard images[id] == nil, pending[id] == nil else { return }
+        guard images[id] == nil, pending[id] == nil, canRetry(id) else { return }
         Task {
             _ = await image(for: id, size: size)
         }
@@ -46,7 +50,8 @@ final class WindowSnapshotter {
     func image(for id: CGWindowID, size: CGSize) async -> CGImage? {
         if let image = images[id] { return image }
         if let task = pending[id] { return await task.value }
-        guard let content else { return nil }
+        guard let content, canRetry(id) else { return nil }
+        attempts[id, default: 0] += 1
         let task = Task { () -> CGImage? in
             guard let window = await content.value?.windows.first(where: { $0.windowID == id }) else { return nil }
             do {
@@ -62,6 +67,11 @@ final class WindowSnapshotter {
         pending[id] = nil
         images[id] = image
         return image
+    }
+
+    // Some windows can't be captured at all (System Settings, for example), so give up after a couple of tries.
+    private func canRetry(_ id: CGWindowID) -> Bool {
+        attempts[id, default: 0] < Self.maximumAttempts
     }
 
     private static func capture(_ window: SCWindow, size: CGSize) async throws -> CGImage {

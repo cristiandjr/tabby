@@ -87,6 +87,11 @@ public enum CGWindowSource {
         return list.compactMap(CGWindowRecord.init(dictionary:))
     }
 
+    public static func existingIDs() -> Set<CGWindowID> {
+        guard let list = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return [] }
+        return Set(list.compactMap { ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value })
+    }
+
     public static func bounds(for ids: [CGWindowID]) -> [CGWindowID: CGRect] {
         guard !ids.isEmpty else { return [:] }
         let wanted = Set(ids)

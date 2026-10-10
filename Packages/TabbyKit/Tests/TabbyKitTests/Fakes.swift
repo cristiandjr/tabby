@@ -54,9 +54,10 @@ final class FakeMonitor: MissionControlMonitoring {
 final class FakeWindows: WindowProviding {
     var windows: [MissionWindow] = []
     var frames: [CGWindowID: CGRect] = [:]
+    var missingFromSnapshot: Set<CGWindowID> = []
 
     func snapshot() -> [MissionWindow] {
-        windows
+        windows.filter { !missingFromSnapshot.contains($0.id) }
     }
 
     func realSize(of id: CGWindowID) -> CGSize? {

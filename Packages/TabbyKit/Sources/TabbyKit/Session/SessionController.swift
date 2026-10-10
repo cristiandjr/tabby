@@ -39,7 +39,8 @@ public final class SessionController {
     static let openingSettleTime: Duration = .milliseconds(400)
     static let desktopStableTime: Duration = .milliseconds(100)
     static let desktopChangeTimeout: Duration = .seconds(1)
-    static let desktopMotionThreshold: CGFloat = 20
+    static let desktopMatchTimeout: Duration = .seconds(2)
+    static let desktopMotionThreshold: CGFloat = 10
 
     private struct DesktopChange {
         var visible: Set<CGWindowID>
@@ -201,24 +202,34 @@ public final class SessionController {
         let now = dependencies.clock.now
         let visible = dependencies.windows.visibleWindowIDs(on: session.display)
         let frames = dependencies.windows.liveFrames(of: Array(visible))
-        let unchanged = visible == session.visibleWindows
-        // Until the window list changes, a sliding desktop is only visible as motion.
-        if visible != change.visible || (unchanged && Self.displacement(from: change.frames, to: frames) > Self.desktopMotionThreshold) {
+        if visible != change.visible || Self.displacement(from: change.frames, to: frames) > Self.desktopMotionThreshold {
             change.stableSince = now
         }
         change.visible = visible
         change.frames = frames
         desktopChange = change
-        guard now - change.stableSince >= Self.desktopStableTime || now - change.detectedAt >= Self.desktopChangeTimeout else { return }
+        let timedOut = now - change.detectedAt >= Self.desktopChangeTimeout
+        guard now - change.stableSince >= Self.desktopStableTime || timedOut else { return }
+        let unchanged = visible == session.visibleWindows
+        var windows: [MissionWindow] = []
+        if !unchanged {
+            windows = dependencies.windows.snapshot().filter { $0.displayID == session.display }
+            // Apps list the windows of the new desktop only ~0.9 s after the switch; keep asking for a while.
+            if windows.count < visible.count, now - change.detectedAt < Self.desktopMatchTimeout {
+                change.stableSince = now
+                desktopChange = change
+                return
+            }
+        }
         desktopChange = nil
         let waited = Int((now - change.detectedAt) / .milliseconds(1))
-        log.info("desktop settled after \(waited) ms: \(unchanged ? "same windows" : "\(visible.count) visible windows", privacy: .public) · \(self.pendingActions.count) keys waiting")
+        log.info("desktop settled after \(waited) ms: \(unchanged ? "same windows" : "\(windows.count) of \(visible.count) visible windows", privacy: .public) · \(self.pendingActions.count) keys waiting")
         if unchanged {
             tracker.update(liveFrames: frames)
             dependencies.presenter.prepare(for: Array(session.windows.values))
             render()
         } else {
-            rebuildForCurrentDesktop(from: session, visible: visible)
+            rebuildForCurrentDesktop(from: session, windows: windows, visible: visible)
         }
         let actions = pendingActions
         pendingActions = []
@@ -227,13 +238,12 @@ public final class SessionController {
         }
     }
 
-    private func rebuildForCurrentDesktop(from previous: NavigationSession, visible: Set<CGWindowID>) {
-        let windows = dependencies.windows.snapshot().filter { $0.displayID == previous.display }
+    private func rebuildForCurrentDesktop(from previous: NavigationSession, windows: [MissionWindow], visible: Set<CGWindowID>) {
         let kept = previous.engine.selectedID.flatMap { id in windows.firstIndex { $0.id == id } }
         var session = NavigationSession(windows: windows, display: previous.display, startedAt: previous.startedAt, initialIndex: kept ?? 0)
         session.thumbnails = dependencies.thumbnails.thumbnails(for: windows)
         session.visibleWindows = visible
-        startTracking(windows)
+        startTracking(windows, skipsOpeningDelay: true)
         motionGraceEnd = dependencies.clock.now + Self.openingSettleTime
         presented = nil
         refreshTick = 0
@@ -244,14 +254,14 @@ public final class SessionController {
         startRefreshing()
     }
 
-    private func startTracking(_ windows: [MissionWindow]) {
+    private func startTracking(_ windows: [MissionWindow], skipsOpeningDelay: Bool = false) {
         let ids = windows.map(\.id)
         tracker.begin(
             realSizes: ids.reduce(into: [:]) { result, id in result[id] = dependencies.windows.realSize(of: id) },
             liveFrames: dependencies.windows.liveFrames(of: ids),
             openedAt: dependencies.clock.now,
             pointer: dependencies.pointer.location,
-            skipsOpeningDelay: dependencies.reducesMotion()
+            skipsOpeningDelay: skipsOpeningDelay || dependencies.reducesMotion()
         )
     }
 

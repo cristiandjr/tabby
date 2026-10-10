@@ -6,6 +6,8 @@ enum Brand {
     static let cyan = Color(red: 0.07, green: 0.85, blue: 1.0)
     static let gradient = LinearGradient(colors: [blue, cyan], startPoint: .bottomLeading, endPoint: .topTrailing)
     static let mercadoPagoAlias = "cristiandjr.mp"
+    static let usdtAddress = "TFUMsNxJGjum96MKHLfwabf8MTxpVuZLBx"
+    static let usdtNetwork = "Tron (TRC20)"
     static let repository = URL(string: "https://github.com/cristiandjr/tabby")
 
     static func logo(dark: Bool) -> NSImage? {

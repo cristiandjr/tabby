@@ -7,10 +7,12 @@ public final class WindowProvider {
         public var candidates = 0
         public var matchedByPrivateAPI = 0
         public var matchedByFrame = 0
+        public var matchedByCache = 0
         public var unmatched = 0
         public var excludedBySubrole = 0
         public var excludedMinimized = 0
         public var excludedSystem = 0
+        public var excludedOffScreen = 0
         public var unmatchedWindows: [String] = []
 
         public init() {}
@@ -27,6 +29,7 @@ public final class WindowProvider {
     ]
 
     public private(set) var lastDiagnostics = Diagnostics()
+    private let log = Log.logger("windows")
     private var elements: [CGWindowID: AXUIElement] = [:]
     private var systemProcesses: [pid_t: Bool] = [:]
 
@@ -54,17 +57,27 @@ public final class WindowProvider {
                 diagnostics.excludedSystem += 1
                 continue
             }
+            guard let display = Self.displayID(for: record.bounds) else {
+                diagnostics.excludedOffScreen += 1
+                continue
+            }
             diagnostics.candidates += 1
             let axWindows = axWindows(for: record.pid, cache: &axWindowsByPID)
             var used = usedIndices[record.pid] ?? []
-            guard let index = matchIndex(for: record, in: axWindows, excluding: used, diagnostics: &diagnostics) else {
+            let element: AXUIElement
+            if let index = matchIndex(for: record, in: axWindows, excluding: used, diagnostics: &diagnostics) {
+                used.insert(index)
+                usedIndices[record.pid] = used
+                element = axWindows[index]
+            } else if let known = elements[record.id] {
+                // After a desktop switch inside Mission Control, apps list their windows again only ~0.9 s later.
+                diagnostics.matchedByCache += 1
+                element = known
+            } else {
                 diagnostics.unmatched += 1
                 diagnostics.unmatchedWindows.append("\(record.ownerName) \(Int(record.bounds.width))x\(Int(record.bounds.height))")
                 continue
             }
-            used.insert(index)
-            usedIndices[record.pid] = used
-            let element = axWindows[index]
             if AX.bool(element, kAXMinimizedAttribute) == true {
                 diagnostics.excludedMinimized += 1
                 continue
@@ -83,12 +96,14 @@ public final class WindowProvider {
                 appName: app?.localizedName ?? record.ownerName,
                 title: AX.string(element, kAXTitleAttribute),
                 frame: record.bounds,
-                displayID: Self.displayID(for: record.bounds),
+                displayID: display,
                 zIndex: windows.count
             ))
         }
-        elements = found
+        let alive = CGWindowSource.existingIDs()
+        elements = elements.merging(found) { _, new in new }.filter { alive.contains($0.key) }
         lastDiagnostics = diagnostics
+        log.info("snapshot: \(windows.count) windows · candidates \(diagnostics.candidates) · private API \(diagnostics.matchedByPrivateAPI) · by frame \(diagnostics.matchedByFrame) · cached \(diagnostics.matchedByCache) · unmatched \(diagnostics.unmatched) · off-screen \(diagnostics.excludedOffScreen) · minimized \(diagnostics.excludedMinimized) · subrole \(diagnostics.excludedBySubrole) · system \(diagnostics.excludedSystem)")
         return windows
     }
 
@@ -139,10 +154,19 @@ public final class WindowProvider {
         return index
     }
 
-    static func displayID(for frame: CGRect) -> CGDirectDisplayID {
-        var display: CGDirectDisplayID = 0
+    // A window that touches no display belongs nowhere: parked off-screen, or passing by while Mission Control slides desktops.
+    static func displayID(for frame: CGRect) -> CGDirectDisplayID? {
+        var displays = [CGDirectDisplayID](repeating: 0, count: 8)
         var count: UInt32 = 0
-        CGGetDisplaysWithPoint(CGPoint(x: frame.midX, y: frame.midY), 1, &display, &count)
-        return count > 0 ? display : CGMainDisplayID()
+        guard CGGetDisplaysWithRect(frame, 8, &displays, &count) == .success, count > 0 else { return nil }
+        return display(for: frame, among: displays.prefix(Int(count)).map { ($0, CGDisplayBounds($0)) })
+    }
+
+    static func display(for frame: CGRect, among displays: [(id: CGDirectDisplayID, bounds: CGRect)]) -> CGDirectDisplayID? {
+        func overlap(_ bounds: CGRect) -> CGFloat {
+            let shared = bounds.intersection(frame)
+            return shared.isNull ? 0 : shared.width * shared.height
+        }
+        return displays.filter { overlap($0.bounds) > 0 }.max { overlap($0.bounds) < overlap($1.bounds) }?.id
     }
 }

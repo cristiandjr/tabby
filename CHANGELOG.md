@@ -4,9 +4,20 @@ All notable changes to Tabby are documented here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.0-alpha.4] - 2026-10-10
+
+### Added
+
+- About and the README also list a USDT address on the Tron (TRC20) network, so people outside Argentina can support Tabby too.
+
 ### Changed
 
 - The menu bar icon is now the colorful Tabby icon instead of a black-and-white silhouette, so it's easier to spot.
+
+### Fixed
+
+- The lift effect stops retrying to capture windows that macOS doesn't allow capturing, such as System Settings. Those windows get the plain highlight.
+- Switching desktops inside Mission Control no longer mixes in windows of the desktop you just left, and Tabby now waits for macOS to list the windows of the new desktop (it takes about a second) before it rebuilds the list. Keys pressed meanwhile are applied once the list is ready, so Return goes to a window of the desktop on screen instead of an empty list or the previous desktop.
 
 ## [0.1.0-alpha.3] - 2026-10-09
 

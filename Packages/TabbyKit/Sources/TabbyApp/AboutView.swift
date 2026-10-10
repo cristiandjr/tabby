@@ -4,7 +4,6 @@ import TabbyKit
 
 struct AboutView: View {
     let version: String
-    @State private var copied = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -14,27 +13,18 @@ struct AboutView: View {
             if let repository = Brand.repository {
                 Link("github.com/cristiandjr/tabby", destination: repository)
             }
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 Text("Made with ❤️ in Argentina 🇦🇷")
                     .font(.headline)
                 Text("Tabby is free and open source. If it saves you time every day, you can buy me a coffee: every contribution helps add features and keep Tabby up to date with each new macOS.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) {
-                    Text("Mercado Pago alias")
-                        .foregroundStyle(.secondary)
-                    Text(Brand.mercadoPagoAlias)
-                        .font(.body.monospaced().bold())
-                        .textSelection(.enabled)
-                    Button(copied ? "Copied ✓" : "Copy alias") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(Brand.mercadoPagoAlias, forType: .string)
-                        copied = true
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Brand.blue)
-                }
+                CopyRow(label: "Mercado Pago alias (Argentina)", value: Brand.mercadoPagoAlias, button: "Copy alias")
+                CopyRow(label: "USDT on the \(Brand.usdtNetwork) network (anywhere in the world)", value: Brand.usdtAddress, button: "Copy address")
+                Text("Send only USDT on the \(Brand.usdtNetwork) network to that address.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
             .padding(16)
             .frame(maxWidth: .infinity)
@@ -46,5 +36,35 @@ struct AboutView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct CopyRow: View {
+    let label: String
+    let value: String
+    let button: String
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                Text(value)
+                    .font(.callout.monospaced().bold())
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Button(copied ? "Copied ✓" : button) {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(value, forType: .string)
+                    copied = true
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Brand.blue)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

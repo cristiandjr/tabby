@@ -315,13 +315,69 @@ struct SessionControllerTests {
         #expect(presenter.dismissals == 1)
         #expect(presenter.prepared.count == 2)
         #expect(presenter.last?.windowID == 7)
-        #expect(presenter.last?.isHighlighted == false)
+        #expect(presenter.last?.isHighlighted == true)
         #expect(keyboard.mode == .intercept)
         #expect(changed == 2)
-        clock.advance(by: HighlightTracker.openingDelay)
+    }
+
+    @Test func waitsForTheThumbnailsToStopBeforeRebuilding() {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        windows.windows = [makeWindow(7)]
+        for x in stride(from: -600, through: 100, by: 100) {
+            windows.frames[7] = CGRect(x: CGFloat(x), y: 100, width: 500, height: 400)
+            controller.refresh()
+            #expect(controller.state.session?.engine.windowIDs == [1, 2, 3])
+            clock.advance(by: SessionController.desktopStableTime)
+        }
         controller.refresh()
-        #expect(presenter.last?.windowID == 7)
+        #expect(controller.state.session?.engine.windowIDs == [7])
         #expect(presenter.last?.isHighlighted == true)
+    }
+
+    @Test func givesAccessibilityAMomentWhenItMissesAWindow() {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        windows.windows = [makeWindow(7), makeWindow(8)]
+        windows.missingFromSnapshot = [8]
+        controller.refresh()
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+        #expect(controller.state.session?.engine.windowIDs == [1, 2, 3])
+        windows.missingFromSnapshot = []
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+        #expect(controller.state.session?.engine.windowIDs == [7, 8])
+    }
+
+    @Test func keepsAskingForMissingWindowsUntilTheMatchTimeout() {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        windows.windows = [makeWindow(7), makeWindow(8)]
+        windows.missingFromSnapshot = [8]
+        controller.refresh()
+        for _ in 0..<8 {
+            clock.advance(by: SessionController.desktopStableTime)
+            controller.refresh()
+            #expect(controller.state.session?.engine.windowIDs == [1, 2, 3])
+        }
+        windows.missingFromSnapshot = []
+        clock.advance(by: SessionController.desktopStableTime)
+        controller.refresh()
+        #expect(controller.state.session?.engine.windowIDs == [7, 8])
+    }
+
+    @Test func rebuildsWithWhatAccessibilityReturnsAfterTheMatchTimeout() {
+        open()
+        clock.advance(by: SessionController.openingSettleTime)
+        windows.windows = [makeWindow(7), makeWindow(8)]
+        windows.missingFromSnapshot = [8]
+        controller.refresh()
+        for _ in 0..<21 {
+            clock.advance(by: SessionController.desktopStableTime)
+            controller.refresh()
+        }
+        #expect(controller.state.session?.engine.windowIDs == [7])
     }
 
     @Test func hidesTheStaleHighlightAndWaitsForTheTransitionToSettle() {

@@ -1,4 +1,8 @@
 <p align="center">
+  <b>English</b> &nbsp;·&nbsp; <a href="README.es.md">Español</a>
+</p>
+
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
     <img src="docs/assets/logo-light.png" alt="Tabby" width="440">
@@ -6,7 +10,6 @@
 </p>
 
 <h3 align="center">Keyboard navigation for macOS Mission Control</h3>
-<p align="center"><em>Navegación con teclado para Mission Control de macOS</em></p>
 
 <p align="center">
   <img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-111111?logo=apple&logoColor=white">
@@ -19,24 +22,16 @@
   <a href="../../releases/latest/download/Tabby.zip"><img alt="Download for macOS" src="https://img.shields.io/badge/macOS-Download%20Tabby-0A5CFF?style=for-the-badge&logo=apple&logoColor=white"></a>
   <br>
   <sub>No installer: download the zip, open Tabby.app, done. Universal (Apple Silicon + Intel) · macOS 14+ · <a href="../../releases">all releases</a></sub>
-  <br>
-  <sub>Sin instalador: descarga el zip, abre Tabby.app y listo. Universal (Apple Silicon + Intel) · macOS 14+ · <a href="../../releases">todas las versiones</a></sub>
 </p>
 
-<p align="center">
-  <a href="#english">English</a> &nbsp;·&nbsp; <a href="#espanol">Español</a>
-</p>
+<!-- Demo video: drag the .mp4 into any GitHub issue or pull request comment, copy the URL GitHub generates and paste it here on its own line. GitHub renders it as a player. -->
 
 ---
-
-<a id="english"></a>
-
-## English
 
 > [!NOTE]
 > Tabby is in alpha: it works every day on the author's Mac, but expect rough edges. Bug reports are very welcome.
 
-### What is Tabby?
+## What is Tabby?
 
 Mission Control shows all your open windows at a glance, but choosing one still means reaching for the mouse or the trackpad. **Tabby lets you do it with the keyboard**, the same way you use ⌘Tab.
 
@@ -50,7 +45,7 @@ Mission Control shows all your open windows at a glance, but choosing one still 
 
 Tabby doesn't replace Mission Control or draw its own switcher. It works on top of the native one.
 
-### Features
+## Features
 
 | | |
 |---|---|
@@ -64,7 +59,7 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 | 🔒 **Private** | No analytics, no accounts. It only listens to the keyboard while Mission Control is open, and its only network request is the optional check for new versions. |
 | 💸 **Free and open source** | MIT licensed. |
 
-### Roadmap
+## Roadmap
 
 - [x] **Spike 0:** validate the macOS capabilities Tabby relies on
 - [x] **v0.1.0-alpha.1:** menu bar app with Tab, ⇧Tab and Return, lift effect, desktops and Settings
@@ -73,7 +68,7 @@ Tabby doesn't replace Mission Control or draw its own switcher. It works on top 
 - [x] Move the selected window to another desktop with a shortcut
 - [ ] Number shortcuts (1–9) and window search
 
-### Download
+## Download
 
 Tabby is a single download, with no installer. Use the **Download** button at the top, or:
 
@@ -81,7 +76,7 @@ Tabby is a single download, with no installer. Use the **Download** button at th
 2. Drag **Tabby.app** to your **Applications** folder. It also runs from Downloads, but *Launch at Login* needs it in Applications.
 3. Open **Tabby.app**.
 
-#### The first time macOS blocks it
+### The first time macOS blocks it
 
 Tabby is free and isn't notarized by Apple, which requires a paid developer account. So the first time you open it, macOS says that Apple could not verify that Tabby is free of malware, and offers to move it to the Trash. Tabby is safe and its code is open, so:
 
@@ -93,14 +88,14 @@ Tabby is free and isn't notarized by Apple, which requires a paid developer acco
 
 Tabby opens, its icon appears in the menu bar, and a short welcome tour guides you through the **Accessibility** permission and a first try. You only do this once, although a new version downloaded from the internet may ask again.
 
-#### If Tabby still doesn't open
+### If Tabby still doesn't open
 
 - **Nothing happens after Open Anyway:** the password or Touch ID request may be waiting on another display or on another desktop. Open Mission Control to find it.
 - **Double-clicking Tabby does nothing:** a copy may be stuck waiting for that approval. Open **Activity Monitor**, select **Tabby**, click **ⓧ** and choose **Force Quit**. Then go through the steps above again.
 - **There's no Open Anyway button:** it's only there for about an hour after macOS blocks Tabby. Open Tabby again so that macOS blocks it, and go back to **Privacy & Security**.
 - **You have several copies of Tabby:** keep only the one in **Applications** and delete the rest, including the zip, so you always open the same one.
 
-### Privacy
+## Privacy
 
 macOS requires Accessibility permission for apps that detect Mission Control, read window information and focus windows that belong to other apps. Tabby uses it for exactly that:
 
@@ -110,11 +105,11 @@ macOS requires Accessibility permission for apps that detect Mission Control, re
 - **Screen Recording is optional** and only powers the lift effect. Tabby captures the windows of the current display while Mission Control is open, keeps the images in memory and drops them when it closes. Nothing is saved or sent. Without it, Tabby works the same with a plain highlight.
 - The code is open, so you can check all of the above.
 
-### Requirements
+## Requirements
 
 macOS 14 Sonoma or later · Apple Silicon or Intel
 
-### Development
+## Development
 
 ```bash
 swift test --package-path Packages/TabbyKit
@@ -130,127 +125,14 @@ open build/Tabby.app
 
 Ideas, issues and pull requests are welcome. If something doesn't work, open **Diagnostics…** in the menu, copy the report and paste it in the issue.
 
-### Support Tabby
+## Support Tabby
 
 Tabby is free and open source, made with ❤️ in Argentina 🇦🇷. If it saves you time every day, you can buy me a coffee: every contribution helps add features and keep Tabby up to date with each new macOS.
 
-- **Mercado Pago** alias: `cristiandjr.mp`
+- **Mercado Pago** alias (Argentina): `cristiandjr.mp`
+- **USDT** on the Tron (TRC20) network, from anywhere in the world: `TFUMsNxJGjum96MKHLfwabf8MTxpVuZLBx` — send only USDT on TRC20 to this address.
 - Starring the repo ⭐ and sharing Tabby with a friend helps a lot too.
 
-### License
+## License
 
 The code is released under the [MIT License](LICENSE). The Tabby name, logo and icon are not covered by the MIT License.
-
----
-
-<a id="espanol"></a>
-
-## Español
-
-> [!NOTE]
-> Tabby está en alfa: funciona todos los días en la Mac de su autor, pero puede tener detalles. Los reportes de errores son muy bienvenidos.
-
-### ¿Qué es Tabby?
-
-Mission Control muestra todas tus ventanas abiertas de un vistazo, pero para elegir una todavía tienes que ir al mouse o al trackpad. **Tabby te permite hacerlo con el teclado**, igual que con ⌘Tab.
-
-<p align="center">
-  <kbd>⌃</kbd> <kbd>↑</kbd> &nbsp;➜&nbsp; <kbd>Tab</kbd> <kbd>Tab</kbd> &nbsp;➜&nbsp; <kbd>Enter ↩</kbd>
-</p>
-
-1. **Abre Mission Control** como siempre: atajo de teclado, F3, gesto del trackpad o esquina activa.
-2. **Presiona <kbd>Tab</kbd>** para recorrer tus ventanas, empezando por la más reciente. <kbd>⇧</kbd> <kbd>Tab</kbd> vuelve atrás.
-3. **Presiona <kbd>Enter ↩</kbd>**: Mission Control se cierra y esa ventana exacta pasa al frente.
-
-Tabby no reemplaza Mission Control ni dibuja su propio selector: funciona encima del nativo.
-
-### Funciones
-
-| | |
-|---|---|
-| ⌨️ **Primero el teclado** | Tab, ⇧Tab y Enter dentro de Mission Control, empezando por la ventana más reciente. |
-| 🎯 **La ventana exacta** | Enfoca la ventana que elegiste, aunque haya varias de la misma app. |
-| ✨ **Sabes dónde estás** | La ventana seleccionada se levanta un poco con un resorte suave y vuelve a su lugar al pasar a otra. |
-| 🗂️ **Mándala a un escritorio** | <kbd>⌘</kbd><kbd>1</kbd>…<kbd>⌘</kbd><kbd>9</kbd> mueve la ventana seleccionada a ese escritorio y, si todavía no existe, lo crea. |
-| ⚙️ **Tus atajos** | Cambia cualquier atajo en **Settings**. |
-| 🪄 **Como sea que lo abras** | Atajo, F3, gesto o esquina activa: Tabby no depende de ninguno. |
-| 🍎 **Nativa** | Swift, SwiftUI y AppKit. Una app mínima en la barra de menús que no estorba. |
-| 🔒 **Privada** | Sin analíticas y sin cuentas. Solo escucha el teclado mientras Mission Control está abierto, y lo único que consulta por red es si hay una versión nueva (opcional). |
-| 💸 **Gratis y de código abierto** | Licencia MIT. |
-
-### Hoja de ruta
-
-- [x] **Spike 0:** validar las capacidades de macOS que necesita Tabby
-- [x] **v0.1.0-alpha.1:** app de barra de menús con Tab, ⇧Tab y Enter, efecto de agrandar, escritorios y Configuración
-- [ ] **v0.1.0:** primera versión estable
-- [ ] Navegación con flechas según la posición de las miniaturas
-- [x] Mover la ventana seleccionada a otro escritorio con un atajo
-- [ ] Atajos numéricos (1–9) y búsqueda de ventanas
-
-### Descarga
-
-Tabby es una sola descarga, sin instalador. Usa el botón **Download** de arriba, o:
-
-1. Descarga [**Tabby.zip**](../../releases/latest/download/Tabby.zip) de la última versión y ábrelo para descomprimir **Tabby.app**.
-2. Arrastra **Tabby.app** a la carpeta **Aplicaciones**. También funciona desde Descargas, pero *Abrir al iniciar sesión* necesita que esté en Aplicaciones.
-3. Abre **Tabby.app**.
-
-#### La primera vez, macOS la bloquea
-
-Tabby es gratis y no está notarizada por Apple, porque eso requiere una cuenta paga de desarrollador. Por eso, la primera vez que la abres, macOS avisa que Apple no pudo verificar que Tabby no contenga software malicioso y ofrece mandarla a la papelera. Tabby es segura y su código es abierto, así que:
-
-1. Haz clic en **Listo**. No la mandes a la papelera.
-2. Abre **Configuración del Sistema → Privacidad y seguridad** y baja hasta **Seguridad**. Vas a ver *Se bloqueó "Tabby" para proteger tu Mac.*
-3. Haz clic en **Abrir de todos modos**.
-4. macOS vuelve a preguntar: haz clic en **Abrir de todos modos**.
-5. Escribe tu contraseña o usa Touch ID.
-
-Tabby se abre, su ícono aparece en la barra de menús y una bienvenida corta te guía con el permiso de **Accesibilidad** y una primera prueba. Esto se hace una sola vez, aunque una versión nueva descargada de internet puede volver a pedirlo.
-
-#### Si Tabby sigue sin abrir
-
-- **No pasa nada después de «Abrir de todos modos»:** el pedido de contraseña o Touch ID puede estar esperando en otra pantalla o en otro escritorio. Abre Mission Control para encontrarlo.
-- **Haces doble clic en Tabby y no pasa nada:** puede haber una copia trabada esperando esa aprobación. Abre el **Monitor de Actividad**, selecciona **Tabby**, haz clic en **ⓧ** y elige **Forzar salida**. Después repite los pasos de arriba.
-- **No aparece «Abrir de todos modos»:** el botón solo está durante una hora, más o menos, después de que macOS bloquea Tabby. Vuelve a abrir Tabby para que macOS la bloquee y entra otra vez a **Privacidad y seguridad**.
-- **Tienes varias copias de Tabby:** deja solo la de **Aplicaciones** y borra las demás, también el zip, así siempre abres la misma.
-
-### Privacidad
-
-macOS exige el permiso de Accesibilidad a las apps que detectan Mission Control, leen información de las ventanas y enfocan ventanas de otras apps. Tabby lo usa solo para eso:
-
-- Solo escucha el teclado mientras Mission Control está abierto.
-- Nunca guarda ni envía lo que escribes.
-- No tiene analíticas ni cuentas. Lo único que hace por red es buscar versiones nuevas: al abrirse y cada 12 horas lee la última versión publicada en GitHub. No se envía nada sobre ti, y se puede desactivar en Settings.
-- **Grabación de pantalla es opcional** y solo se usa para el efecto de agrandar. Tabby captura las ventanas de la pantalla actual mientras Mission Control está abierto, guarda las imágenes en memoria y las descarta al cerrarlo. No se guarda ni se envía nada. Sin ese permiso, Tabby funciona igual con un recuadro simple.
-- El código es abierto: puedes comprobar todo lo anterior.
-
-### Requisitos
-
-macOS 14 Sonoma o posterior · Apple Silicon o Intel
-
-### Desarrollo
-
-```bash
-swift test --package-path Packages/TabbyKit
-scripts/build-app.sh
-open build/Tabby.app
-```
-
-| Ruta | Qué es |
-|---|---|
-| `Packages/TabbyKit` | Lógica principal: detección de Mission Control, teclado, ventanas y navegación. |
-| `TabbyApp` | La app de barra de menús, empaquetada por `scripts/build-app.sh`. |
-| `tabby-probe` | Herramienta de diagnóstico guiada que comprueba qué permite tu versión de macOS. Ver [docs/spikes](docs/spikes/README.md). |
-
-Las ideas, los issues y los pull requests son bienvenidos. Si algo no funciona, abre **Diagnostics…** en el menú, copia el reporte y pégalo en el issue.
-
-### Apoya a Tabby
-
-Tabby es gratis y de código abierto, hecho con ❤️ en Argentina 🇦🇷. Si te ahorra tiempo todos los días, puedes invitarme un café: cada aporte ayuda a sumar funciones y a mantener Tabby al día con cada macOS nuevo.
-
-- Alias de **Mercado Pago**: `cristiandjr.mp`
-- Dejar una ⭐ en el repo y compartir Tabby con alguien también ayuda muchísimo.
-
-### Licencia
-
-El código se publica bajo la [Licencia MIT](LICENSE). El nombre, el logo y el ícono de Tabby no están cubiertos por la Licencia MIT.
