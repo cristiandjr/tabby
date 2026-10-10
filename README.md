@@ -84,14 +84,15 @@ Tabby is free and isn't notarized by Apple, which requires a paid developer acco
 2. Open **System Settings → Privacy & Security** and scroll down to **Security**. You'll see *"Tabby" was blocked to protect your Mac.*
 3. Click **Open Anyway**.
 4. macOS asks again: click **Open Anyway**.
-5. Enter your password or use Touch ID.
+5. Enter your password or use Touch ID. If no prompt shows up, check your other display: it sometimes opens there.
+6. **If Tabby's icon doesn't appear in the menu bar after a few seconds, quit the stuck copy and open Tabby again.** The copy you opened before approving stays frozen, and macOS keeps sending every new double-click to it. Open **Activity Monitor**, select **Tabby**, click **ⓧ** → **Force Quit**, and open Tabby again. Your approval is already saved, so this time it starts right away. (Terminal: `pkill -9 Tabby; open ~/Downloads/Tabby.app`.)
 
 Tabby opens, its icon appears in the menu bar, and a short welcome tour guides you through the **Accessibility** permission and a first try. You only do this once, although a new version downloaded from the internet may ask again.
 
 ### If Tabby still doesn't open
 
 - **Nothing happens after Open Anyway:** the password or Touch ID request may be waiting on another display or on another desktop. Open Mission Control to find it.
-- **Double-clicking Tabby does nothing:** a copy may be stuck waiting for that approval. Open **Activity Monitor**, select **Tabby**, click **ⓧ** and choose **Force Quit**. Then go through the steps above again.
+- **Double-clicking Tabby does nothing:** a copy is stuck waiting for that approval. Force quit it as in step 6 and open Tabby again. If macOS blocks it again, go through the steps above once more.
 - **There's no Open Anyway button:** it's only there for about an hour after macOS blocks Tabby. Open Tabby again so that macOS blocks it, and go back to **Privacy & Security**.
 - **You have several copies of Tabby:** keep only the one in **Applications** and delete the rest, including the zip, so you always open the same one.
 

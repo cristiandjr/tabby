@@ -84,14 +84,15 @@ Tabby es gratis y no está notarizada por Apple, porque eso requiere una cuenta 
 2. Abre **Configuración del Sistema → Privacidad y seguridad** y baja hasta **Seguridad**. Vas a ver *Se bloqueó "Tabby" para proteger tu Mac.*
 3. Haz clic en **Abrir de todos modos**.
 4. macOS vuelve a preguntar: haz clic en **Abrir de todos modos**.
-5. Escribe tu contraseña o usa Touch ID.
+5. Escribe tu contraseña o usa Touch ID. Si no aparece ningún pedido, mira tu otra pantalla: a veces se abre ahí.
+6. **Si el ícono de Tabby no aparece en la barra de menús después de unos segundos, cierra la copia trabada y vuelve a abrir Tabby.** La copia que abriste antes de aprobar queda congelada, y macOS manda cada doble clic nuevo a esa copia. Abre el **Monitor de Actividad**, selecciona **Tabby**, haz clic en **ⓧ** → **Forzar salida**, y abre Tabby otra vez. Tu aprobación ya quedó guardada, así que esta vez arranca al instante. (Terminal: `pkill -9 Tabby; open ~/Downloads/Tabby.app`.)
 
 Tabby se abre, su ícono aparece en la barra de menús y una bienvenida corta te guía con el permiso de **Accesibilidad** y una primera prueba. Esto se hace una sola vez, aunque una versión nueva descargada de internet puede volver a pedirlo.
 
 ### Si Tabby sigue sin abrir
 
 - **No pasa nada después de «Abrir de todos modos»:** el pedido de contraseña o Touch ID puede estar esperando en otra pantalla o en otro escritorio. Abre Mission Control para encontrarlo.
-- **Haces doble clic en Tabby y no pasa nada:** puede haber una copia trabada esperando esa aprobación. Abre el **Monitor de Actividad**, selecciona **Tabby**, haz clic en **ⓧ** y elige **Forzar salida**. Después repite los pasos de arriba.
+- **Haces doble clic en Tabby y no pasa nada:** hay una copia trabada esperando esa aprobación. Fuérzala a salir como en el paso 6 y vuelve a abrir Tabby. Si macOS la vuelve a bloquear, repite los pasos de arriba una vez más.
 - **No aparece «Abrir de todos modos»:** el botón solo está durante una hora, más o menos, después de que macOS bloquea Tabby. Vuelve a abrir Tabby para que macOS la bloquee y entra otra vez a **Privacidad y seguridad**.
 - **Tienes varias copias de Tabby:** deja solo la de **Aplicaciones** y borra las demás, también el zip, así siempre abres la misma.
 
